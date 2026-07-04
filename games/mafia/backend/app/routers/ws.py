@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
+from app.platform.game_session_manager import GameSessionManager, game_session_manager as _game_session_manager
 from app.platform.room_manager import RoomManager
 from app.routers.rooms import get_room_manager
 from app.schemas.ws_events import PlayerConnectionChangedEvent, RoomStateEvent
@@ -21,6 +22,10 @@ def get_connection_manager() -> ConnectionManager:
     return _connection_manager
 
 
+def get_game_session_manager() -> GameSessionManager:
+    return _game_session_manager
+
+
 @router.websocket("/ws/{room_code}")
 async def room_socket(
     websocket: WebSocket,
@@ -28,6 +33,7 @@ async def room_socket(
     player_id: str,
     manager: RoomManager = Depends(get_room_manager),
     connections: ConnectionManager = Depends(get_connection_manager),
+    games: GameSessionManager = Depends(get_game_session_manager),
 ) -> None:
     room_code = room_code.upper()
     room = await manager.get_room(room_code)
@@ -39,7 +45,10 @@ async def room_socket(
     room.players[player_id].connected = True
 
     invite_url = manager.build_invite_url(room_code)
-    await connections.send_to_player(room_code, player_id, RoomStateEvent(room=to_room_out(room, invite_url)))
+    game_state = await games.get_phase_snapshot(room_code)
+    await connections.send_to_player(
+        room_code, player_id, RoomStateEvent(room=to_room_out(room, invite_url, game_state))
+    )
     await connections.broadcast(
         room_code,
         PlayerConnectionChangedEvent(player_id=player_id, connected=True),
@@ -55,6 +64,7 @@ async def room_socket(
                 player_id=player_id,
                 room_manager=manager,
                 connection_manager=connections,
+                game_session_manager=games,
             )
             if should_close:
                 await websocket.close(code=1000)

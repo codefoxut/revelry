@@ -141,6 +141,12 @@ class RoomManager:
         await self._room_store.save(room)
         return room
 
+    async def set_phase(self, code: str, phase: RoomPhase) -> Room:
+        room = await self.require_room(code)
+        room.phase = phase
+        await self._room_store.save(room)
+        return room
+
     def _require_player(self, room: Room, player_id: str) -> Player:
         player = room.players.get(player_id)
         if player is None:

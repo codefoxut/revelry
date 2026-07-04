@@ -61,9 +61,19 @@ export interface LeaveRoomCommand {
   type: "leave_room";
 }
 
+export interface StartGameCommand {
+  type: "start_game";
+}
+
+export interface AdvancePhaseCommand {
+  type: "advance_phase";
+}
+
 export type ClientCommand =
   | PingCommand
   | SetReadyCommand
   | UpdateProfileCommand
   | KickPlayerCommand
-  | LeaveRoomCommand;
+  | LeaveRoomCommand
+  | StartGameCommand
+  | AdvancePhaseCommand;

@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from app.platform.exceptions import PermissionDeniedError, PlayerNotFoundError
+from app.platform.exceptions import (
+    GameAlreadyStartedError,
+    GameNotStartedError,
+    InvalidGameStateError,
+    NotEnoughPlayersError,
+    PermissionDeniedError,
+    PlayerNotFoundError,
+)
+from app.platform.game_session_manager import GameSessionManager
 from app.platform.room_manager import RoomManager
 from app.schemas.ws_events import ErrorEvent, KickedEvent, PongEvent, RoomStateEvent
 from app.services.room_presenter import to_room_out
@@ -17,6 +25,7 @@ async def dispatch_client_event(
     player_id: str,
     room_manager: RoomManager,
     connection_manager: ConnectionManager,
+    game_session_manager: GameSessionManager,
 ) -> bool:
     """Route one parsed client message to its handler.
 
@@ -34,20 +43,28 @@ async def dispatch_client_event(
         return False
 
     if event_type == "set_ready":
-        await _handle_set_ready(raw_event, room_code, player_id, room_manager, connection_manager)
+        await _handle_set_ready(raw_event, room_code, player_id, room_manager, connection_manager, game_session_manager)
         return False
 
     if event_type == "update_profile":
-        await _handle_update_profile(raw_event, room_code, player_id, room_manager, connection_manager)
+        await _handle_update_profile(raw_event, room_code, player_id, room_manager, connection_manager, game_session_manager)
         return False
 
     if event_type == "kick_player":
-        await _handle_kick_player(raw_event, room_code, player_id, room_manager, connection_manager)
+        await _handle_kick_player(raw_event, room_code, player_id, room_manager, connection_manager, game_session_manager)
         return False
 
     if event_type == "leave_room":
-        await _handle_leave_room(room_code, player_id, room_manager, connection_manager)
+        await _handle_leave_room(room_code, player_id, room_manager, connection_manager, game_session_manager)
         return True
+
+    if event_type == "start_game":
+        await _handle_start_game(room_code, player_id, room_manager, game_session_manager, connection_manager)
+        return False
+
+    if event_type == "advance_phase":
+        await _handle_advance_phase(room_code, player_id, room_manager, game_session_manager, connection_manager)
+        return False
 
     await _send_error(connection_manager, room_code, player_id, "unknown_event", f"Unrecognized event type: {event_type!r}")
     return False
@@ -59,6 +76,7 @@ async def _handle_set_ready(
     player_id: str,
     room_manager: RoomManager,
     connection_manager: ConnectionManager,
+    game_session_manager: GameSessionManager,
 ) -> None:
     ready = raw_event.get("ready")
     if not isinstance(ready, bool):
@@ -71,7 +89,7 @@ async def _handle_set_ready(
         await _send_error(connection_manager, room_code, player_id, "player_not_found", str(exc))
         return
 
-    await _broadcast_room_state(room_code, room_manager, connection_manager)
+    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_update_profile(
@@ -80,6 +98,7 @@ async def _handle_update_profile(
     player_id: str,
     room_manager: RoomManager,
     connection_manager: ConnectionManager,
+    game_session_manager: GameSessionManager,
 ) -> None:
     display_name = raw_event.get("display_name")
     avatar = raw_event.get("avatar")
@@ -99,7 +118,7 @@ async def _handle_update_profile(
         await _send_error(connection_manager, room_code, player_id, "player_not_found", str(exc))
         return
 
-    await _broadcast_room_state(room_code, room_manager, connection_manager)
+    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_kick_player(
@@ -108,6 +127,7 @@ async def _handle_kick_player(
     player_id: str,
     room_manager: RoomManager,
     connection_manager: ConnectionManager,
+    game_session_manager: GameSessionManager,
 ) -> None:
     target_id = raw_event.get("target_player_id")
     if not target_id:
@@ -122,7 +142,7 @@ async def _handle_kick_player(
 
     await connection_manager.send_to_player(room_code, target_id, KickedEvent())
     await connection_manager.close(room_code, target_id, code=_CLOSE_KICKED)
-    await _broadcast_room_state(room_code, room_manager, connection_manager)
+    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_leave_room(
@@ -130,21 +150,68 @@ async def _handle_leave_room(
     player_id: str,
     room_manager: RoomManager,
     connection_manager: ConnectionManager,
+    game_session_manager: GameSessionManager,
 ) -> None:
     remaining_room = await room_manager.leave_room(room_code, player_id)
     connection_manager.disconnect(room_code, player_id)
     if remaining_room is not None:
-        await _broadcast_room_state(room_code, room_manager, connection_manager)
+        await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+
+
+async def _handle_start_game(
+    room_code: str,
+    player_id: str,
+    room_manager: RoomManager,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+) -> None:
+    try:
+        await game_session_manager.start_game(room_code, player_id)
+    except PermissionDeniedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
+        return
+    except GameAlreadyStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_already_started", str(exc))
+        return
+    except NotEnoughPlayersError as exc:
+        await _send_error(connection_manager, room_code, player_id, "not_enough_players", str(exc))
+        return
+
+    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+
+
+async def _handle_advance_phase(
+    room_code: str,
+    player_id: str,
+    room_manager: RoomManager,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+) -> None:
+    try:
+        await game_session_manager.advance_phase(room_code, player_id)
+    except PermissionDeniedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
+        return
+    except GameNotStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except InvalidGameStateError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
+        return
+
+    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _broadcast_room_state(
     room_code: str,
     room_manager: RoomManager,
     connection_manager: ConnectionManager,
+    game_session_manager: GameSessionManager,
 ) -> None:
     room = await room_manager.require_room(room_code)
     invite_url = room_manager.build_invite_url(room_code)
-    await connection_manager.broadcast(room_code, RoomStateEvent(room=to_room_out(room, invite_url)))
+    game_state = await game_session_manager.get_phase_snapshot(room_code)
+    await connection_manager.broadcast(room_code, RoomStateEvent(room=to_room_out(room, invite_url, game_state)))
 
 
 async def _send_error(

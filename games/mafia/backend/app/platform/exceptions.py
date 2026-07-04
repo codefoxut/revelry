@@ -12,3 +12,25 @@ class PermissionDeniedError(Exception):
 
 class PlayerNotFoundError(Exception):
     """Raised when a player id doesn't correspond to a player in the room."""
+
+
+class NotEnoughPlayersError(Exception):
+    """Raised when starting a game with fewer active players than the
+    game module requires.
+    """
+
+
+class GameAlreadyStartedError(Exception):
+    """Raised when starting a game for a room that isn't in the lobby."""
+
+
+class GameNotStartedError(Exception):
+    """Raised when acting on a game (e.g. advancing its phase) before it
+    has been started.
+    """
+
+
+class InvalidGameStateError(Exception):
+    """Raised when a game action is illegal in the engine's current phase
+    (e.g. advancing past a terminal phase).
+    """

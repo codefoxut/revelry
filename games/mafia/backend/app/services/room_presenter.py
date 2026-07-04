@@ -1,12 +1,13 @@
 from app.platform.room import Room
-from app.schemas.room import PlayerOut, RoomOut
+from app.schemas.room import GameStateOut, PlayerOut, RoomOut
 
 
-def to_room_out(room: Room, invite_url: str) -> RoomOut:
+def to_room_out(room: Room, invite_url: str, game_state: dict[str, object] | None = None) -> RoomOut:
     """Map the in-memory Room domain object to its public API shape.
 
     Shared between the REST router and the WebSocket layer so both send an
-    identically-shaped room snapshot.
+    identically-shaped room snapshot. `game_state` is the active game
+    engine's `phase_snapshot()` output, if any (None while still in lobby).
     """
     return RoomOut(
         code=room.code,
@@ -27,4 +28,5 @@ def to_room_out(room: Room, invite_url: str) -> RoomOut:
             for player in room.players.values()
         ],
         invite_url=invite_url,
+        game_state=GameStateOut(**game_state) if game_state is not None else None,
     )

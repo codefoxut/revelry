@@ -28,3 +28,12 @@ class GameEngine(ABC):
 
     @abstractmethod
     async def handle_command(self, command: Command) -> list[Event]: ...
+
+    @abstractmethod
+    def phase_snapshot(self) -> dict[str, object]:
+        """A JSON-serializable `{"phase": ..., "round_number": ...}`-shaped
+        view of where the game currently is, for the room_state broadcast.
+        Every phase-driven game has *a* current phase and *a* round/turn
+        counter, so this stays in the base interface rather than leaking a
+        Mafia-specific type into code that should stay game-agnostic.
+        """

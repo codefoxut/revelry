@@ -24,6 +24,16 @@ class PlayerOut(BaseModel):
     connected: bool
 
 
+class GameStateOut(BaseModel):
+    """Where the room's active game currently is. Absent while still in the
+    lobby; every phase-driven game reports at least a phase name and a
+    round/turn counter (see GameEngine.phase_snapshot).
+    """
+
+    phase: str
+    round_number: int
+
+
 class RoomOut(BaseModel):
     code: str
     game_type: str
@@ -32,6 +42,7 @@ class RoomOut(BaseModel):
     max_players: int
     players: list[PlayerOut]
     invite_url: str
+    game_state: GameStateOut | None = None
 
 
 class CreateRoomResponse(BaseModel):

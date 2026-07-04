@@ -70,3 +70,19 @@ class KickPlayerCommand(BaseModel):
 
 class LeaveRoomCommand(BaseModel):
     type: Literal["leave_room"] = "leave_room"
+
+
+class StartGameCommand(BaseModel):
+    """Host-only: moves the room out of the lobby into the game's first
+    phase (Mafia: NIGHT).
+    """
+
+    type: Literal["start_game"] = "start_game"
+
+
+class AdvancePhaseCommand(BaseModel):
+    """Host-only: manually advances to the next phase in the game's cycle.
+    Stands in for automatic timer/vote-driven advancement (later steps).
+    """
+
+    type: Literal["advance_phase"] = "advance_phase"

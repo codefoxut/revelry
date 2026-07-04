@@ -8,6 +8,11 @@ export interface Player {
   connected: boolean;
 }
 
+export interface GameState {
+  phase: string;
+  round_number: number;
+}
+
 export interface Room {
   code: string;
   game_type: string;
@@ -16,6 +21,7 @@ export interface Room {
   max_players: number;
   players: Player[];
   invite_url: string;
+  game_state: GameState | null;
 }
 
 export interface RoomSummary {
