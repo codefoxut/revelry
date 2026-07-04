@@ -37,6 +37,10 @@ pnpm-debug.log*
 coverage/
 .pytest_cache/
 
+# SQLite
+*.db
+*.sqlite3
+
 # Build outputs
 build/
 
