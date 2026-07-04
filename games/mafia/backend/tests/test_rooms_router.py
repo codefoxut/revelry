@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.platform.room import RoomPhase
 from app.platform.room_manager import RoomManager
 from app.platform.stores.in_memory import InMemoryStore
 from app.platform.stores.room_store import RoomStore
@@ -89,3 +90,66 @@ async def test_join_unknown_room_returns_404():
         )
 
     assert response.status_code == 404
+
+
+async def test_join_full_room_returns_409():
+    async with await _client() as client:
+        created = await client.post(
+            "/api/rooms",
+            json={"game_type": "mafia", "host_display_name": "Alice"},
+        )
+        code = created.json()["room"]["code"]
+
+        # A fresh room defaults to a max of 20 players, so drive it full via
+        # the manager directly rather than joining 20 times over HTTP.
+        test_manager = app.dependency_overrides[get_room_manager]()
+        room = await test_manager.get_room(code)
+        room.max_players = 1
+
+        response = await client.post(
+            f"/api/rooms/{code}/join",
+            json={"display_name": "Bob"},
+        )
+
+    assert response.status_code == 409
+
+
+async def test_create_and_join_persist_avatar():
+    async with await _client() as client:
+        created = await client.post(
+            "/api/rooms",
+            json={"game_type": "mafia", "host_display_name": "Alice", "host_avatar": "fox"},
+        )
+        code = created.json()["room"]["code"]
+
+        joined = await client.post(
+            f"/api/rooms/{code}/join",
+            json={"display_name": "Bob", "avatar": "owl"},
+        )
+
+    host_player = created.json()["room"]["players"][0]
+    guest_player = joined.json()["room"]["players"][1]
+    assert host_player["avatar"] == "fox"
+    assert guest_player["avatar"] == "owl"
+
+
+async def test_join_in_progress_room_via_rest_is_spectator():
+    async with await _client() as client:
+        created = await client.post(
+            "/api/rooms",
+            json={"game_type": "mafia", "host_display_name": "Alice"},
+        )
+        code = created.json()["room"]["code"]
+
+        test_manager = app.dependency_overrides[get_room_manager]()
+        room = await test_manager.get_room(code)
+        room.phase = RoomPhase.IN_GAME
+
+        joined = await client.post(
+            f"/api/rooms/{code}/join",
+            json={"display_name": "Latecomer"},
+        )
+
+    assert joined.status_code == 200
+    latecomer = joined.json()["room"]["players"][-1]
+    assert latecomer["is_spectator"] is True

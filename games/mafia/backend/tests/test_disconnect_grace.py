@@ -103,6 +103,36 @@ def test_reconnect_within_grace_period_prevents_removal(isolated_manager):
                 assert guest_id in room_after.players
 
 
+def test_kicking_a_player_with_a_pending_grace_timer_is_not_double_removed(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    _, guest_id = _join_room(isolated_manager, room.code)
+    client = TestClient(app)
+
+    with client:
+        with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket:
+            host_socket.receive_json()  # initial room_state
+
+            with client.websocket_connect(f"/ws/{room.code}?player_id={guest_id}"):
+                host_socket.receive_json()  # presence: guest connected
+
+            host_socket.receive_json()  # presence: guest disconnected — schedules a grace removal
+
+            # Kick the same player before its grace timer would fire — this
+            # already removes them from room.players synchronously, so the
+            # later-firing grace-removal task must see it's gone and no-op
+            # rather than erroring or broadcasting a second removal.
+            host_socket.send_json({"type": "kick_player", "target_player_id": guest_id})
+            kick_broadcast = host_socket.receive_json()
+
+            time.sleep(_FAST_GRACE_SECONDS * 6)  # long enough for the grace timer to fire (and no-op)
+
+            room_after = asyncio.run(isolated_manager.get_room(room.code))
+
+    assert kick_broadcast["type"] == "room_state"
+    assert all(p["id"] != guest_id for p in kick_broadcast["room"]["players"])
+    assert guest_id not in room_after.players
+
+
 def test_disconnect_during_active_game_is_not_removed(isolated_manager):
     room, host_id = _create_room(isolated_manager)
     guest_ids = [_join_room(isolated_manager, room.code, display_name=f"P{i}")[1] for i in range(3)]

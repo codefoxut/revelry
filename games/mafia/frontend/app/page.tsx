@@ -4,6 +4,9 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createRoom, joinRoom } from "@/services/api";
 import { savePlayerId } from "@/lib/session";
+import { AvatarPicker } from "@/components/AvatarPicker";
+import { Spinner } from "@/components/Spinner";
+import { AVATARS } from "@/lib/avatars";
 
 type Panel = "closed" | "create" | "join";
 
@@ -12,6 +15,7 @@ export default function Home() {
   const [panel, setPanel] = useState<Panel>("closed");
   const [displayName, setDisplayName] = useState("");
   const [roomCode, setRoomCode] = useState("");
+  const [avatar, setAvatar] = useState<string>(AVATARS[0].key);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,7 +31,7 @@ export default function Home() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const { room, player_id } = await createRoom(displayName.trim());
+      const { room, player_id } = await createRoom(displayName.trim(), avatar);
       savePlayerId(room.code, player_id);
       router.push(`/room/${room.code}`);
     } catch (err) {
@@ -44,7 +48,7 @@ export default function Home() {
     setError(null);
     try {
       const code = roomCode.trim().toUpperCase();
-      const { room, player_id } = await joinRoom(code, displayName.trim());
+      const { room, player_id } = await joinRoom(code, displayName.trim(), avatar);
       savePlayerId(room.code, player_id);
       router.push(`/room/${room.code}`);
     } catch (err) {
@@ -102,12 +106,18 @@ export default function Home() {
               maxLength={24}
               className="h-12 rounded-full border border-zinc-700 bg-zinc-900 px-5 text-center text-zinc-50 outline-none focus:border-rose-500"
             />
-            {error && <p className="text-sm text-rose-400">{error}</p>}
+            <AvatarPicker value={avatar} onChange={setAvatar} />
+            {error && (
+              <p role="alert" className="text-sm text-rose-400">
+                {error}
+              </p>
+            )}
             <button
               type="submit"
               disabled={isSubmitting || !displayName.trim()}
-              className="h-12 rounded-full bg-rose-500 px-8 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-12 items-center justify-center gap-2 rounded-full bg-rose-500 px-8 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
+              {isSubmitting && <Spinner />}
               {isSubmitting ? "Creating…" : "Create Room"}
             </button>
             <button
@@ -137,12 +147,18 @@ export default function Home() {
               maxLength={24}
               className="h-12 rounded-full border border-zinc-700 bg-zinc-900 px-5 text-center text-zinc-50 outline-none focus:border-rose-500"
             />
-            {error && <p className="text-sm text-rose-400">{error}</p>}
+            <AvatarPicker value={avatar} onChange={setAvatar} />
+            {error && (
+              <p role="alert" className="text-sm text-rose-400">
+                {error}
+              </p>
+            )}
             <button
               type="submit"
               disabled={isSubmitting || !displayName.trim() || !roomCode.trim()}
-              className="h-12 rounded-full bg-rose-500 px-8 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-12 items-center justify-center gap-2 rounded-full bg-rose-500 px-8 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
+              {isSubmitting && <Spinner />}
               {isSubmitting ? "Joining…" : "Join Room"}
             </button>
             <button

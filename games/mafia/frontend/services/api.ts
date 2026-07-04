@@ -9,20 +9,20 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function createRoom(hostDisplayName: string): Promise<CreateRoomResponse> {
+export async function createRoom(hostDisplayName: string, hostAvatar = "default"): Promise<CreateRoomResponse> {
   const response = await fetch(`${API_BASE_URL}/api/rooms`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ game_type: "mafia", host_display_name: hostDisplayName }),
+    body: JSON.stringify({ game_type: "mafia", host_display_name: hostDisplayName, host_avatar: hostAvatar }),
   });
   return parseOrThrow<CreateRoomResponse>(response);
 }
 
-export async function joinRoom(code: string, displayName: string): Promise<CreateRoomResponse> {
+export async function joinRoom(code: string, displayName: string, avatar = "default"): Promise<CreateRoomResponse> {
   const response = await fetch(`${API_BASE_URL}/api/rooms/${code}/join`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ display_name: displayName }),
+    body: JSON.stringify({ display_name: displayName, avatar }),
   });
   return parseOrThrow<CreateRoomResponse>(response);
 }

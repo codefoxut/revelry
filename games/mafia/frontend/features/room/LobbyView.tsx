@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRoomStore } from "@/store/roomStore";
 import { clearPlayerId } from "@/lib/session";
 import { GameView } from "./GameView";
+import { avatarEmoji } from "@/lib/avatars";
 import type { Player } from "@/types/room";
 
 // Mirrors MAFIA_MODULE.min_players in app/games/mafia/__init__.py.
@@ -98,13 +99,21 @@ export function LobbyView() {
         </header>
 
         {status === "reconnecting" && (
-          <p className="rounded-lg border border-amber-900 bg-amber-950/50 px-4 py-2 text-center text-sm text-amber-300">
+          <p
+            role="status"
+            aria-live="polite"
+            className="rounded-lg border border-amber-900 bg-amber-950/50 px-4 py-2 text-center text-sm text-amber-300"
+          >
             Connection lost — reconnecting…
           </p>
         )}
 
         {lastError && (
-          <p className="rounded-lg border border-rose-900 bg-rose-950/50 px-4 py-2 text-center text-sm text-rose-300">
+          <p
+            role="alert"
+            aria-live="assertive"
+            className="rounded-lg border border-rose-900 bg-rose-950/50 px-4 py-2 text-center text-sm text-rose-300"
+          >
             {lastError.message}
           </p>
         )}
@@ -194,6 +203,7 @@ function PlayerRow({
     <li className="flex items-center justify-between rounded-lg px-3 py-2">
       <div className="flex items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${player.connected ? "bg-emerald-500" : "bg-zinc-600"}`} />
+        <span aria-hidden="true">{avatarEmoji(player.avatar)}</span>
         <span className="font-medium">
           {player.display_name}
           {isSelf && <span className="text-zinc-500"> (you)</span>}

@@ -6,6 +6,9 @@ import { useRoomStore } from "@/store/roomStore";
 import { joinRoom } from "@/services/api";
 import { clearPlayerId, loadPlayerId, savePlayerId } from "@/lib/session";
 import { LobbyView } from "@/features/room/LobbyView";
+import { AvatarPicker } from "@/components/AvatarPicker";
+import { Spinner } from "@/components/Spinner";
+import { AVATARS } from "@/lib/avatars";
 
 const ROOM_OR_PLAYER_NOT_FOUND = 4404;
 
@@ -20,6 +23,7 @@ export default function RoomPage() {
 
   const [needsName, setNeedsName] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [avatar, setAvatar] = useState<string>(AVATARS[0].key);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
 
@@ -50,7 +54,7 @@ export default function RoomPage() {
     setIsJoining(true);
     setJoinError(null);
     try {
-      const { room, player_id } = await joinRoom(roomCode, displayName.trim());
+      const { room, player_id } = await joinRoom(roomCode, displayName.trim(), avatar);
       savePlayerId(room.code, player_id);
       setNeedsName(false);
       connect(room.code, player_id);
@@ -76,12 +80,18 @@ export default function RoomPage() {
             maxLength={24}
             className="h-12 rounded-full border border-zinc-700 bg-zinc-900 px-5 text-center text-zinc-50 outline-none focus:border-rose-500"
           />
-          {joinError && <p className="text-sm text-rose-400">{joinError}</p>}
+          <AvatarPicker value={avatar} onChange={setAvatar} />
+          {joinError && (
+            <p role="alert" className="text-sm text-rose-400">
+              {joinError}
+            </p>
+          )}
           <button
             type="submit"
             disabled={isJoining || !displayName.trim()}
-            className="h-12 rounded-full bg-rose-500 px-8 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-12 items-center justify-center gap-2 rounded-full bg-rose-500 px-8 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
+            {isJoining && <Spinner />}
             {isJoining ? "Joining…" : "Join Room"}
           </button>
         </form>

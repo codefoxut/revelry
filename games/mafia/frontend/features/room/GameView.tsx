@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRoomStore } from "@/store/roomStore";
+import { avatarEmoji } from "@/lib/avatars";
 import type { Player } from "@/types/room";
 
 export function GameView() {
@@ -65,6 +66,7 @@ export function GameView() {
       {myRole && (
         <div className="flex flex-col items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
           <span className="text-xs uppercase tracking-wide text-zinc-500">Your role</span>
+          {self && <span aria-hidden="true" className="text-2xl">{avatarEmoji(self.avatar)}</span>}
           <span className="text-xl font-semibold text-rose-400">{myRole.display_name}</span>
           <span className="text-xs uppercase tracking-wide text-zinc-600">{myRole.team} team</span>
           <p className="mt-1 text-center text-sm text-zinc-400">{myRole.description}</p>
