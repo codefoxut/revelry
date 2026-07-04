@@ -27,10 +27,9 @@ from app.schemas.ws_events import (
     NightResultEvent,
     PongEvent,
     RoleAssignedEvent,
-    RoomStateEvent,
     VoteCastEvent,
 )
-from app.services.room_presenter import to_room_out
+from app.services.room_presenter import broadcast_room_state
 from app.websocket.connection_manager import ConnectionManager
 
 # Close code used when a host kicks another player from the room.
@@ -116,7 +115,7 @@ async def _handle_set_ready(
         await _send_error(connection_manager, room_code, player_id, "player_not_found", str(exc))
         return
 
-    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+    await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_update_profile(
@@ -145,7 +144,7 @@ async def _handle_update_profile(
         await _send_error(connection_manager, room_code, player_id, "player_not_found", str(exc))
         return
 
-    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+    await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_kick_player(
@@ -169,7 +168,7 @@ async def _handle_kick_player(
 
     await connection_manager.send_to_player(room_code, target_id, KickedEvent())
     await connection_manager.close(room_code, target_id, code=_CLOSE_KICKED)
-    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+    await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_leave_room(
@@ -182,7 +181,7 @@ async def _handle_leave_room(
     remaining_room = await room_manager.leave_room(room_code, player_id)
     connection_manager.disconnect(room_code, player_id)
     if remaining_room is not None:
-        await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+        await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_start_game(
@@ -208,7 +207,7 @@ async def _handle_start_game(
         if isinstance(event, EngineRoleAssignedEvent):
             await connection_manager.send_to_player(room_code, event.player_id, _to_ws_role_assigned(event))
 
-    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+    await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_advance_phase(
@@ -242,7 +241,7 @@ async def _handle_advance_phase(
         elif isinstance(event, EngineGameOverEvent):
             await connection_manager.broadcast(room_code, GameOverEvent(winning_team=event.winning_team))
 
-    await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+    await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _handle_night_action(
@@ -297,18 +296,6 @@ async def _handle_cast_vote(
         return
 
     await connection_manager.broadcast(room_code, VoteCastEvent(player_id=player_id, target_player_id=target_id))
-
-
-async def _broadcast_room_state(
-    room_code: str,
-    room_manager: RoomManager,
-    connection_manager: ConnectionManager,
-    game_session_manager: GameSessionManager,
-) -> None:
-    room = await room_manager.require_room(room_code)
-    invite_url = room_manager.build_invite_url(room_code)
-    game_state = await game_session_manager.get_phase_snapshot(room_code)
-    await connection_manager.broadcast(room_code, RoomStateEvent(room=to_room_out(room, invite_url, game_state)))
 
 
 def _to_ws_role_assigned(event: EngineRoleAssignedEvent) -> RoleAssignedEvent:

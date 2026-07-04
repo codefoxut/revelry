@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
+from app.platform.disconnect_grace import DisconnectGraceManager
 from app.platform.game_session_manager import GameSessionManager, game_session_manager as _game_session_manager
+from app.platform.room import RoomPhase
 from app.platform.room_manager import RoomManager
 from app.routers.rooms import get_room_manager
 from app.schemas.room import RoleOut
@@ -14,6 +16,7 @@ from app.websocket.dispatcher import dispatch_client_event
 router = APIRouter()
 
 _connection_manager = ConnectionManager()
+_disconnect_grace_manager = DisconnectGraceManager()
 
 # Codes above 4000 are the application-reserved range for WS close codes.
 _CLOSE_ROOM_OR_PLAYER_NOT_FOUND = 4404
@@ -27,6 +30,10 @@ def get_game_session_manager() -> GameSessionManager:
     return _game_session_manager
 
 
+def get_disconnect_grace_manager() -> DisconnectGraceManager:
+    return _disconnect_grace_manager
+
+
 @router.websocket("/ws/{room_code}")
 async def room_socket(
     websocket: WebSocket,
@@ -35,6 +42,7 @@ async def room_socket(
     manager: RoomManager = Depends(get_room_manager),
     connections: ConnectionManager = Depends(get_connection_manager),
     games: GameSessionManager = Depends(get_game_session_manager),
+    grace: DisconnectGraceManager = Depends(get_disconnect_grace_manager),
 ) -> None:
     room_code = room_code.upper()
     room = await manager.get_room(room_code)
@@ -42,6 +50,7 @@ async def room_socket(
         await websocket.close(code=_CLOSE_ROOM_OR_PLAYER_NOT_FOUND)
         return
 
+    grace.cancel(room_code, player_id)
     await connections.connect(room_code, player_id, websocket)
     room.players[player_id].connected = True
 
@@ -96,3 +105,5 @@ async def room_socket(
                 room_code,
                 PlayerConnectionChangedEvent(player_id=player_id, connected=False),
             )
+            if room.phase == RoomPhase.LOBBY:
+                grace.schedule_removal(room_code, player_id, manager, connections, games)

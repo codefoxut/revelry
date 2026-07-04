@@ -3,7 +3,7 @@ import { RoomSocket } from "@/services/socket";
 import type { Room } from "@/types/room";
 import type { ClientCommand, RoleOut } from "@/types/ws-events";
 
-type ConnectionStatus = "idle" | "connecting" | "connected" | "closed";
+type ConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "closed";
 
 interface NightResult {
   eliminatedPlayerId: string | null;
@@ -62,6 +62,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     const socket = new RoomSocket(roomCode, playerId, {
       onOpen: () => set({ status: "connected" }),
       onClose: (event) => set({ status: "closed", closeCode: event.code }),
+      onReconnecting: () => set({ status: "reconnecting" }),
       onEvent: (event) => {
         switch (event.type) {
           case "room_state": {

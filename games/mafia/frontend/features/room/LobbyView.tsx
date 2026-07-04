@@ -97,6 +97,12 @@ export function LobbyView() {
           </button>
         </header>
 
+        {status === "reconnecting" && (
+          <p className="rounded-lg border border-amber-900 bg-amber-950/50 px-4 py-2 text-center text-sm text-amber-300">
+            Connection lost — reconnecting…
+          </p>
+        )}
+
         {lastError && (
           <p className="rounded-lg border border-rose-900 bg-rose-950/50 px-4 py-2 text-center text-sm text-rose-300">
             {lastError.message}
