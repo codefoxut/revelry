@@ -8,6 +8,12 @@ class CreateRoomRequest(BaseModel):
     is_private: bool = False
 
 
+class JoinRoomRequest(BaseModel):
+    display_name: str
+    avatar: str = "default"
+    as_spectator: bool = False
+
+
 class PlayerOut(BaseModel):
     id: str
     display_name: str

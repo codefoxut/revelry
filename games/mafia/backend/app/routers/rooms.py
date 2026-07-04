@@ -1,37 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.platform.room import Room
+from app.platform.exceptions import RoomFullError, RoomNotFoundError
 from app.platform.room_manager import RoomManager, room_manager
-from app.schemas.room import CreateRoomRequest, CreateRoomResponse, PlayerOut, RoomOut, RoomSummary
+from app.schemas.room import CreateRoomRequest, CreateRoomResponse, JoinRoomRequest, RoomSummary
+from app.services.room_presenter import to_room_out
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
 
 def get_room_manager() -> RoomManager:
     return room_manager
-
-
-def _to_room_out(room: Room, manager: RoomManager) -> RoomOut:
-    return RoomOut(
-        code=room.code,
-        game_type=room.game_type,
-        is_private=room.is_private,
-        phase=room.phase.value,
-        max_players=room.max_players,
-        players=[
-            PlayerOut(
-                id=player.id,
-                display_name=player.display_name,
-                avatar=player.avatar,
-                is_host=player.is_host,
-                is_ready=player.is_ready,
-                is_spectator=player.is_spectator,
-                connected=player.connected,
-            )
-            for player in room.players.values()
-        ],
-        invite_url=manager.build_invite_url(room.code),
-    )
 
 
 @router.post("", response_model=CreateRoomResponse, status_code=status.HTTP_201_CREATED)
@@ -45,7 +23,30 @@ async def create_room(
         host_avatar=payload.host_avatar,
         is_private=payload.is_private,
     )
-    return CreateRoomResponse(room=_to_room_out(room, manager), player_id=host_id)
+    invite_url = manager.build_invite_url(room.code)
+    return CreateRoomResponse(room=to_room_out(room, invite_url), player_id=host_id)
+
+
+@router.post("/{code}/join", response_model=CreateRoomResponse)
+async def join_room(
+    code: str,
+    payload: JoinRoomRequest,
+    manager: RoomManager = Depends(get_room_manager),
+) -> CreateRoomResponse:
+    try:
+        room, player_id = await manager.join_room(
+            code.upper(),
+            display_name=payload.display_name,
+            avatar=payload.avatar,
+            as_spectator=payload.as_spectator,
+        )
+    except RoomNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found") from exc
+    except RoomFullError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Room is full") from exc
+
+    invite_url = manager.build_invite_url(room.code)
+    return CreateRoomResponse(room=to_room_out(room, invite_url), player_id=player_id)
 
 
 @router.get("/{code}", response_model=RoomSummary)

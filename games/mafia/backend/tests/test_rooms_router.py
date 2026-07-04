@@ -60,3 +60,32 @@ async def test_get_unknown_room_returns_404():
         response = await client.get("/api/rooms/ZZZZZ")
 
     assert response.status_code == 404
+
+
+async def test_join_room_adds_second_player():
+    async with await _client() as client:
+        created = await client.post(
+            "/api/rooms",
+            json={"game_type": "mafia", "host_display_name": "Alice"},
+        )
+        code = created.json()["room"]["code"]
+
+        response = await client.post(
+            f"/api/rooms/{code}/join",
+            json={"display_name": "Bob"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["room"]["players"]) == 2
+    assert body["room"]["players"][1]["id"] == body["player_id"]
+
+
+async def test_join_unknown_room_returns_404():
+    async with await _client() as client:
+        response = await client.post(
+            "/api/rooms/ZZZZZ/join",
+            json={"display_name": "Bob"},
+        )
+
+    assert response.status_code == 404

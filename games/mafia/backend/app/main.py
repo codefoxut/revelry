@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import init_db
-from app.routers import health, rooms
+from app.routers import health, rooms, ws
 
 
 @asynccontextmanager
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(rooms.router)
+    app.include_router(ws.router)
 
     return app
 
