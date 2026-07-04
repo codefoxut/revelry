@@ -33,11 +33,40 @@ class PongEvent(BaseModel):
     type: Literal["pong"] = "pong"
 
 
+class KickedEvent(BaseModel):
+    """Sent to a player right before the server closes their socket after
+    a host kick, so the client can show why it was disconnected.
+    """
+
+    type: Literal["kicked"] = "kicked"
+
+
 # ---- Client -> Server ----
 # Parsed by hand in the dispatcher (looking at the raw `type` field) rather
-# than a discriminated union, since there's only one command so far —
-# lobby/game/chat commands join this list in later steps.
+# than a discriminated union — keeps adding a command a one-line diff in the
+# dispatcher instead of touching a shared union type. Game/chat commands
+# join this list in later steps.
 
 
 class PingCommand(BaseModel):
     type: Literal["ping"] = "ping"
+
+
+class SetReadyCommand(BaseModel):
+    type: Literal["set_ready"] = "set_ready"
+    ready: bool
+
+
+class UpdateProfileCommand(BaseModel):
+    type: Literal["update_profile"] = "update_profile"
+    display_name: str | None = None
+    avatar: str | None = None
+
+
+class KickPlayerCommand(BaseModel):
+    type: Literal["kick_player"] = "kick_player"
+    target_player_id: str
+
+
+class LeaveRoomCommand(BaseModel):
+    type: Literal["leave_room"] = "leave_room"

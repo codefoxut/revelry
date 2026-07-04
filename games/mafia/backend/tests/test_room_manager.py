@@ -1,6 +1,11 @@
 import pytest
 
-from app.platform.exceptions import PermissionDeniedError, RoomFullError, RoomNotFoundError
+from app.platform.exceptions import (
+    PermissionDeniedError,
+    PlayerNotFoundError,
+    RoomFullError,
+    RoomNotFoundError,
+)
 from app.platform.room import RoomPhase
 from app.platform.room_manager import RoomManager
 from app.platform.stores.in_memory import InMemoryStore
@@ -95,3 +100,38 @@ async def test_host_cannot_kick_self(manager: RoomManager):
 def test_build_invite_url_contains_code(manager: RoomManager):
     url = manager.build_invite_url("ABCDE")
     assert url.endswith("/room/ABCDE")
+
+
+async def test_set_ready_toggles_player_state(manager: RoomManager):
+    room, host_id = await manager.create_room("mafia", "Alice")
+
+    room = await manager.set_ready(room.code, host_id, True)
+    assert room.players[host_id].is_ready is True
+
+    room = await manager.set_ready(room.code, host_id, False)
+    assert room.players[host_id].is_ready is False
+
+
+async def test_set_ready_unknown_player_raises(manager: RoomManager):
+    room, _ = await manager.create_room("mafia", "Alice")
+
+    with pytest.raises(PlayerNotFoundError):
+        await manager.set_ready(room.code, "nobody", True)
+
+
+async def test_update_profile_changes_display_name_and_avatar(manager: RoomManager):
+    room, host_id = await manager.create_room("mafia", "Alice")
+
+    room = await manager.update_profile(room.code, host_id, display_name="Alicia", avatar="fox")
+
+    assert room.players[host_id].display_name == "Alicia"
+    assert room.players[host_id].avatar == "fox"
+
+
+async def test_update_profile_partial_update_leaves_other_field(manager: RoomManager):
+    room, host_id = await manager.create_room("mafia", "Alice", host_avatar="cat")
+
+    room = await manager.update_profile(room.code, host_id, display_name="Alicia")
+
+    assert room.players[host_id].display_name == "Alicia"
+    assert room.players[host_id].avatar == "cat"

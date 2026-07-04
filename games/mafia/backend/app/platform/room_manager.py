@@ -5,7 +5,12 @@ import string
 import uuid
 
 from app.config import get_settings
-from app.platform.exceptions import PermissionDeniedError, RoomFullError, RoomNotFoundError
+from app.platform.exceptions import (
+    PermissionDeniedError,
+    PlayerNotFoundError,
+    RoomFullError,
+    RoomNotFoundError,
+)
 from app.platform.room import Player, Room, RoomPhase
 from app.platform.stores.in_memory import InMemoryStore
 from app.platform.stores.room_store import RoomStore
@@ -112,6 +117,35 @@ class RoomManager:
         room.players.pop(target_id, None)
         await self._room_store.save(room)
         return room
+
+    async def set_ready(self, code: str, player_id: str, ready: bool) -> Room:
+        room = await self.require_room(code)
+        player = self._require_player(room, player_id)
+        player.is_ready = ready
+        await self._room_store.save(room)
+        return room
+
+    async def update_profile(
+        self,
+        code: str,
+        player_id: str,
+        display_name: str | None = None,
+        avatar: str | None = None,
+    ) -> Room:
+        room = await self.require_room(code)
+        player = self._require_player(room, player_id)
+        if display_name is not None:
+            player.display_name = display_name
+        if avatar is not None:
+            player.avatar = avatar
+        await self._room_store.save(room)
+        return room
+
+    def _require_player(self, room: Room, player_id: str) -> Player:
+        player = room.players.get(player_id)
+        if player is None:
+            raise PlayerNotFoundError(f"No player {player_id!r} in room {room.code!r}")
+        return player
 
     def _migrate_host(self, room: Room) -> None:
         """Promote the longest-present remaining player to host."""

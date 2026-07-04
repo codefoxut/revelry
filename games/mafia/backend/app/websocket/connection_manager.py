@@ -27,6 +27,15 @@ class ConnectionManager:
         if not room_connections:
             self._connections.pop(room_code, None)
 
+    async def close(self, room_code: str, player_id: str, code: int = 1000) -> None:
+        """Forcibly close and forget a player's socket (used for kicks and
+        explicit leaves, as opposed to the client disconnecting on its own).
+        """
+        websocket = self._connections.get(room_code, {}).get(player_id)
+        if websocket is not None:
+            await websocket.close(code=code)
+        self.disconnect(room_code, player_id)
+
     async def send_to_player(self, room_code: str, player_id: str, event: BaseModel) -> None:
         websocket = self._connections.get(room_code, {}).get(player_id)
         if websocket is not None:

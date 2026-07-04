@@ -96,3 +96,91 @@ def test_unrecognized_event_receives_error(isolated_manager):
 
     assert response["type"] == "error"
     assert response["code"] == "unknown_event"
+
+
+def test_set_ready_broadcasts_room_state_to_everyone(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    _, guest_id = _join_room(isolated_manager, room.code)
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket:
+        host_socket.receive_json()  # initial room_state
+
+        with client.websocket_connect(f"/ws/{room.code}?player_id={guest_id}") as guest_socket:
+            guest_socket.receive_json()  # guest's own initial room_state
+            host_socket.receive_json()  # presence broadcast for guest joining
+
+            guest_socket.send_json({"type": "set_ready", "ready": True})
+            host_update = host_socket.receive_json()
+            guest_update = guest_socket.receive_json()
+
+    for event in (host_update, guest_update):
+        assert event["type"] == "room_state"
+        players_by_id = {p["id"]: p for p in event["room"]["players"]}
+        assert players_by_id[guest_id]["is_ready"] is True
+
+
+def test_update_profile_changes_display_name(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as socket:
+        socket.receive_json()  # initial room_state
+        socket.send_json({"type": "update_profile", "display_name": "Alicia"})
+        update = socket.receive_json()
+
+    assert update["room"]["players"][0]["display_name"] == "Alicia"
+
+
+def test_non_host_kick_is_rejected(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    _, guest_id = _join_room(isolated_manager, room.code)
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={guest_id}") as guest_socket:
+        guest_socket.receive_json()  # initial room_state
+        guest_socket.send_json({"type": "kick_player", "target_player_id": host_id})
+        response = guest_socket.receive_json()
+
+    assert response["type"] == "error"
+    assert response["code"] == "permission_denied"
+
+
+def test_host_kick_closes_target_socket_and_broadcasts(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    _, guest_id = _join_room(isolated_manager, room.code)
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket:
+        host_socket.receive_json()  # initial room_state
+
+        with client.websocket_connect(f"/ws/{room.code}?player_id={guest_id}") as guest_socket:
+            guest_socket.receive_json()  # guest's own initial room_state
+            host_socket.receive_json()  # presence broadcast for guest joining
+
+            host_socket.send_json({"type": "kick_player", "target_player_id": guest_id})
+            kicked_event = guest_socket.receive_json()
+            room_update = host_socket.receive_json()
+
+    assert kicked_event["type"] == "kicked"
+    assert room_update["type"] == "room_state"
+    assert all(p["id"] != guest_id for p in room_update["room"]["players"])
+
+
+def test_leave_room_removes_player_and_broadcasts(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    _, guest_id = _join_room(isolated_manager, room.code)
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket:
+        host_socket.receive_json()  # initial room_state
+
+        with client.websocket_connect(f"/ws/{room.code}?player_id={guest_id}") as guest_socket:
+            guest_socket.receive_json()  # guest's own initial room_state
+            host_socket.receive_json()  # presence broadcast for guest joining
+
+            guest_socket.send_json({"type": "leave_room"})
+            room_update = host_socket.receive_json()
+
+    assert room_update["type"] == "room_state"
+    assert all(p["id"] != guest_id for p in room_update["room"]["players"])

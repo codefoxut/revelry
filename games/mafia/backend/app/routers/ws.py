@@ -49,12 +49,16 @@ async def room_socket(
     try:
         while True:
             raw_event = await websocket.receive_json()
-            await dispatch_client_event(
+            should_close = await dispatch_client_event(
                 raw_event,
                 room_code=room_code,
                 player_id=player_id,
+                room_manager=manager,
                 connection_manager=connections,
             )
+            if should_close:
+                await websocket.close(code=1000)
+                return
     except WebSocketDisconnect:
         connections.disconnect(room_code, player_id)
         room = await manager.get_room(room_code)

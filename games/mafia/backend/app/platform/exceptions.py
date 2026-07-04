@@ -8,3 +8,7 @@ class RoomFullError(Exception):
 
 class PermissionDeniedError(Exception):
     """Raised when a player attempts an action they aren't authorized for."""
+
+
+class PlayerNotFoundError(Exception):
+    """Raised when a player id doesn't correspond to a player in the room."""
