@@ -15,6 +15,7 @@ Modern party games for friends, families, and teams.
 - Next.js
 - Vue.js
 - FastAPI
+- tornado
 - PostgreSQL
 - Redis
 - WebSockets
