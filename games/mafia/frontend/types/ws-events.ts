@@ -28,12 +28,26 @@ export interface KickedEvent {
   type: "kicked";
 }
 
+export interface RoleOut {
+  key: string;
+  display_name: string;
+  team: string;
+  description: string;
+  acts_at_night: boolean;
+}
+
+export interface RoleAssignedEvent {
+  type: "role_assigned";
+  role: RoleOut;
+}
+
 export type ServerEvent =
   | RoomStateEvent
   | PlayerConnectionChangedEvent
   | ErrorEvent
   | PongEvent
-  | KickedEvent;
+  | KickedEvent
+  | RoleAssignedEvent;
 
 // ---- Client -> Server ----
 

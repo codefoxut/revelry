@@ -5,7 +5,13 @@ class StartGameCommand(Command):
     """Move the game from LOBBY into its first NIGHT. Issued once by the
     host; the WS layer is responsible for the host/precondition checks
     before this ever reaches the engine.
+
+    `active_player_ids` is the roster to assign roles to — the engine has
+    no knowledge of Room/RoomManager, so GameSessionManager passes it in
+    explicitly rather than the engine reaching out to fetch it.
     """
+
+    active_player_ids: list[str]
 
 
 class AdvancePhaseCommand(Command):

@@ -8,6 +8,8 @@ from app.platform.exceptions import (
     NotEnoughPlayersError,
     PermissionDeniedError,
 )
+from app.games.mafia.engine import MafiaGameEngine
+from app.games.mafia.roles import Role
 from app.platform.game_registry import GameRegistry
 from app.platform.room import Room, RoomPhase
 from app.platform.room_manager import RoomManager
@@ -47,8 +49,12 @@ class GameSessionManager:
                 f"(has {room.active_player_count})"
             )
 
+        active_player_ids = [player.id for player in room.players.values() if not player.is_spectator]
+
         engine = module.engine_factory(room_code)
-        events = await engine.handle_command(StartGameCommand(player_id=requester_id))
+        events = await engine.handle_command(
+            StartGameCommand(player_id=requester_id, active_player_ids=active_player_ids)
+        )
         await self._engine_store.save(room_code, engine)
 
         room = await self._room_manager.set_phase(room_code, RoomPhase.IN_GAME)
@@ -68,6 +74,18 @@ class GameSessionManager:
     async def get_phase_snapshot(self, room_code: str) -> dict[str, object] | None:
         engine = await self._engine_store.get(room_code)
         return None if engine is None else engine.phase_snapshot()
+
+    async def get_role(self, room_code: str, player_id: str) -> Role | None:
+        """Pragmatic Mafia-specific accessor: "what role does this player
+        have" doesn't generalize across arbitrary future games the way
+        phase_snapshot does, so this reaches into MafiaGameEngine directly
+        rather than adding a speculative generic method to GameEngine. Worth
+        revisiting once a second game needs an equivalent concept.
+        """
+        engine = await self._engine_store.get(room_code)
+        if not isinstance(engine, MafiaGameEngine):
+            return None
+        return engine.role_for(player_id)
 
 
 # Importing app.games.mafia registers the Mafia module into game_registry

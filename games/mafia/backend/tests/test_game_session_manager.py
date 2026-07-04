@@ -94,3 +94,20 @@ def test_get_phase_snapshot_is_none_before_start(sessions):
     room, host_id = _create_room_with_players(room_manager, 3)
 
     assert asyncio.run(game_sessions.get_phase_snapshot(room.code)) is None
+
+
+def test_get_role_is_none_before_start(sessions):
+    game_sessions, room_manager = sessions
+    room, host_id = _create_room_with_players(room_manager, 3)
+
+    assert asyncio.run(game_sessions.get_role(room.code, host_id)) is None
+
+
+def test_get_role_returns_a_role_for_every_active_player_after_start(sessions):
+    game_sessions, room_manager = sessions
+    room, host_id = _create_room_with_players(room_manager, 3)
+    asyncio.run(game_sessions.start_game(room.code, host_id))
+
+    for player_id in room.players:
+        role = asyncio.run(game_sessions.get_role(room.code, player_id))
+        assert role is not None

@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from app.schemas.room import RoomOut
+from app.schemas.room import RoleOut, RoomOut
 
 # ---- Server -> Client ----
 # One class per event `type`. New event types get added here as later steps
@@ -39,6 +39,15 @@ class KickedEvent(BaseModel):
     """
 
     type: Literal["kicked"] = "kicked"
+
+
+class RoleAssignedEvent(BaseModel):
+    """A player's own role, sent only to that player (once at game start,
+    and again on reconnect) — never broadcast to the room.
+    """
+
+    type: Literal["role_assigned"] = "role_assigned"
+    role: RoleOut
 
 
 # ---- Client -> Server ----

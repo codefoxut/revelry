@@ -12,3 +12,17 @@ class PhaseChangedEvent(Event):
 
     phase: MafiaPhase
     round_number: int
+
+
+class RoleAssignedEvent(Event):
+    """A single player's own role assignment. Unlike PhaseChangedEvent this
+    is never broadcast — the WS layer must deliver each one only to the
+    player it names, since a role is private information.
+    """
+
+    player_id: str
+    role_key: str
+    role_display_name: str
+    team: str
+    description: str
+    acts_at_night: bool

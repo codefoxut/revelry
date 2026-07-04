@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.games.mafia.events import RoleAssignedEvent as EngineRoleAssignedEvent
 from app.platform.exceptions import (
     GameAlreadyStartedError,
     GameNotStartedError,
@@ -10,7 +11,8 @@ from app.platform.exceptions import (
 )
 from app.platform.game_session_manager import GameSessionManager
 from app.platform.room_manager import RoomManager
-from app.schemas.ws_events import ErrorEvent, KickedEvent, PongEvent, RoomStateEvent
+from app.schemas.room import RoleOut
+from app.schemas.ws_events import ErrorEvent, KickedEvent, PongEvent, RoleAssignedEvent, RoomStateEvent
 from app.services.room_presenter import to_room_out
 from app.websocket.connection_manager import ConnectionManager
 
@@ -166,7 +168,7 @@ async def _handle_start_game(
     connection_manager: ConnectionManager,
 ) -> None:
     try:
-        await game_session_manager.start_game(room_code, player_id)
+        _, events = await game_session_manager.start_game(room_code, player_id)
     except PermissionDeniedError as exc:
         await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
         return
@@ -176,6 +178,10 @@ async def _handle_start_game(
     except NotEnoughPlayersError as exc:
         await _send_error(connection_manager, room_code, player_id, "not_enough_players", str(exc))
         return
+
+    for event in events:
+        if isinstance(event, EngineRoleAssignedEvent):
+            await connection_manager.send_to_player(room_code, event.player_id, _to_ws_role_assigned(event))
 
     await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
@@ -212,6 +218,18 @@ async def _broadcast_room_state(
     invite_url = room_manager.build_invite_url(room_code)
     game_state = await game_session_manager.get_phase_snapshot(room_code)
     await connection_manager.broadcast(room_code, RoomStateEvent(room=to_room_out(room, invite_url, game_state)))
+
+
+def _to_ws_role_assigned(event: EngineRoleAssignedEvent) -> RoleAssignedEvent:
+    return RoleAssignedEvent(
+        role=RoleOut(
+            key=event.role_key,
+            display_name=event.role_display_name,
+            team=event.team,
+            description=event.description,
+            acts_at_night=event.acts_at_night,
+        )
+    )
 
 
 async def _send_error(

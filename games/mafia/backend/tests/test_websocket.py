@@ -204,11 +204,47 @@ def test_start_game_with_enough_players_broadcasts_night_phase(isolated_manager)
     with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as socket:
         socket.receive_json()  # initial room_state
         socket.send_json({"type": "start_game"})
+        role_event = socket.receive_json()
         update = socket.receive_json()
 
+    assert role_event["type"] == "role_assigned"
+    assert role_event["role"]["key"] in {"villager", "mafia", "detective", "doctor"}
     assert update["type"] == "room_state"
     assert update["room"]["phase"] == "in_game"
     assert update["room"]["game_state"] == {"phase": "night", "round_number": 1}
+
+
+def test_start_game_delivers_a_role_to_every_player_privately(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    guest_ids = [_join_room(isolated_manager, room.code, display_name=f"Player{i}")[1] for i in range(3)]
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket:
+        host_socket.receive_json()  # initial room_state
+
+        with client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[0]}") as g0, \
+             client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[1]}") as g1, \
+             client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[2]}") as g2:
+            g0.receive_json()  # own initial room_state
+            g1.receive_json()  # own initial room_state
+            g0.receive_json()  # presence: g1 joined
+            g2.receive_json()  # own initial room_state
+            g0.receive_json()  # presence: g2 joined
+            g1.receive_json()  # presence: g2 joined
+            host_socket.receive_json()  # presence: g0 joined
+            host_socket.receive_json()  # presence: g1 joined
+            host_socket.receive_json()  # presence: g2 joined
+
+            host_socket.send_json({"type": "start_game"})
+
+            role_events = []
+            for socket in (host_socket, g0, g1, g2):
+                role_events.append(socket.receive_json())
+                socket.receive_json()  # room_state broadcast
+
+    assert all(event["type"] == "role_assigned" for event in role_events)
+    role_keys = [event["role"]["key"] for event in role_events]
+    assert role_keys.count("mafia") == 1
 
 
 def test_start_game_with_too_few_players_is_rejected(isolated_manager):
@@ -249,12 +285,34 @@ def test_advance_phase_cycles_and_broadcasts(isolated_manager):
     with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as socket:
         socket.receive_json()  # initial room_state
         socket.send_json({"type": "start_game"})
+        socket.receive_json()  # role_assigned
         socket.receive_json()  # room_state: night, round 1
 
         socket.send_json({"type": "advance_phase"})
         day_update = socket.receive_json()
 
     assert day_update["room"]["game_state"] == {"phase": "day", "round_number": 1}
+
+
+def test_reconnect_after_start_resends_own_role(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    for i in range(3):
+        _join_room(isolated_manager, room.code, display_name=f"Player{i}")
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as socket:
+        socket.receive_json()  # initial room_state
+        socket.send_json({"type": "start_game"})
+        first_role_event = socket.receive_json()
+        socket.receive_json()  # room_state
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as socket:
+        reconnect_room_state = socket.receive_json()
+        reconnect_role_event = socket.receive_json()
+
+    assert reconnect_room_state["type"] == "room_state"
+    assert reconnect_role_event["type"] == "role_assigned"
+    assert reconnect_role_event["role"]["key"] == first_role_event["role"]["key"]
 
 
 def test_advance_phase_before_start_is_rejected(isolated_manager):

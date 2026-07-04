@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from app.platform.game_session_manager import GameSessionManager, game_session_manager as _game_session_manager
 from app.platform.room_manager import RoomManager
 from app.routers.rooms import get_room_manager
-from app.schemas.ws_events import PlayerConnectionChangedEvent, RoomStateEvent
+from app.schemas.room import RoleOut
+from app.schemas.ws_events import PlayerConnectionChangedEvent, RoleAssignedEvent, RoomStateEvent
 from app.services.room_presenter import to_room_out
 from app.websocket.connection_manager import ConnectionManager
 from app.websocket.dispatcher import dispatch_client_event
@@ -49,6 +50,23 @@ async def room_socket(
     await connections.send_to_player(
         room_code, player_id, RoomStateEvent(room=to_room_out(room, invite_url, game_state))
     )
+
+    role = await games.get_role(room_code, player_id)
+    if role is not None:
+        await connections.send_to_player(
+            room_code,
+            player_id,
+            RoleAssignedEvent(
+                role=RoleOut(
+                    key=role.key,
+                    display_name=role.display_name,
+                    team=role.team.value,
+                    description=role.description,
+                    acts_at_night=role.acts_at_night,
+                )
+            ),
+        )
+
     await connections.broadcast(
         room_code,
         PlayerConnectionChangedEvent(player_id=player_id, connected=True),

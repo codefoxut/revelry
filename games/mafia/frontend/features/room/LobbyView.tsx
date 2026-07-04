@@ -13,6 +13,7 @@ export function LobbyView() {
   const router = useRouter();
   const room = useRoomStore((state) => state.room);
   const selfPlayerId = useRoomStore((state) => state.selfPlayerId);
+  const myRole = useRoomStore((state) => state.myRole);
   const status = useRoomStore((state) => state.status);
   const kicked = useRoomStore((state) => state.kicked);
   const lastError = useRoomStore((state) => state.lastError);
@@ -123,13 +124,22 @@ export function LobbyView() {
           {room.players.filter((p) => p.is_ready).length} ready
         </p>
 
+        {inGame && myRole && (
+          <div className="flex flex-col items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+            <span className="text-xs uppercase tracking-wide text-zinc-500">Your role</span>
+            <span className="text-xl font-semibold text-rose-400">{myRole.display_name}</span>
+            <span className="text-xs uppercase tracking-wide text-zinc-600">{myRole.team} team</span>
+            <p className="mt-1 text-center text-sm text-zinc-400">{myRole.description}</p>
+          </div>
+        )}
+
         {inGame && room.game_state && (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
             <span className="rounded-full border border-rose-900 bg-rose-950/50 px-4 py-1 text-sm font-medium capitalize text-rose-300">
               {room.game_state.phase} &middot; Round {room.game_state.round_number}
             </span>
             <p className="text-center text-sm text-zinc-500">
-              Role actions and voting are coming up next — for now the host can
+              Night actions and voting are coming up next — for now the host can
               step through phases manually.
             </p>
             {isHost && (

@@ -24,6 +24,16 @@ class PlayerOut(BaseModel):
     connected: bool
 
 
+class RoleOut(BaseModel):
+    """A player's own role — sent only to that player, never broadcast."""
+
+    key: str
+    display_name: str
+    team: str
+    description: str
+    acts_at_night: bool
+
+
 class GameStateOut(BaseModel):
     """Where the room's active game currently is. Absent while still in the
     lobby; every phase-driven game reports at least a phase name and a
