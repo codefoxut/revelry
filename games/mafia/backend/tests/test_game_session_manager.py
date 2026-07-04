@@ -2,14 +2,12 @@ import asyncio
 
 import pytest
 
-from app.games.mafia import MAFIA_MODULE
 from app.platform.exceptions import (
     GameAlreadyStartedError,
     GameNotStartedError,
     NotEnoughPlayersError,
     PermissionDeniedError,
 )
-from app.platform.game_registry import GameRegistry
 from app.platform.game_session_manager import GameSessionManager
 from app.platform.room import RoomPhase
 from app.platform.room_manager import RoomManager
@@ -21,9 +19,7 @@ from app.platform.stores.room_store import RoomStore
 @pytest.fixture
 def sessions():
     room_manager = RoomManager(RoomStore(InMemoryStore()))
-    registry = GameRegistry()
-    registry.register(MAFIA_MODULE)
-    return GameSessionManager(room_manager, registry, GameEngineStore(InMemoryStore())), room_manager
+    return GameSessionManager(room_manager, GameEngineStore(InMemoryStore())), room_manager
 
 
 def _create_room_with_players(room_manager: RoomManager, extra_players: int):

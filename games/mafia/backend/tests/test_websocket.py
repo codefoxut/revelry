@@ -3,9 +3,7 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
-from app.games.mafia import MAFIA_MODULE
 from app.main import app
-from app.platform.game_registry import GameRegistry
 from app.platform.game_session_manager import GameSessionManager
 from app.platform.room_manager import RoomManager
 from app.platform.stores.game_engine_store import GameEngineStore
@@ -25,9 +23,7 @@ def isolated_manager():
     """
     test_manager = RoomManager(RoomStore(InMemoryStore()))
     test_connections = ConnectionManager()
-    test_registry = GameRegistry()
-    test_registry.register(MAFIA_MODULE)
-    test_sessions = GameSessionManager(test_manager, test_registry, GameEngineStore(InMemoryStore()))
+    test_sessions = GameSessionManager(test_manager, GameEngineStore(InMemoryStore()))
     app.dependency_overrides[get_room_manager] = lambda: test_manager
     app.dependency_overrides[get_connection_manager] = lambda: test_connections
     app.dependency_overrides[get_game_session_manager] = lambda: test_sessions

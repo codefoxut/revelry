@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.game_engine.base import Event
+from app.games.mafia import DISPLAY_NAME, MIN_PLAYERS
 from app.games.mafia.commands import (
     AdvancePhaseCommand,
     CastVoteCommand,
@@ -15,7 +16,6 @@ from app.platform.exceptions import (
 )
 from app.games.mafia.engine import MafiaGameEngine
 from app.games.mafia.roles import Role
-from app.platform.game_registry import GameRegistry
 from app.platform.room import Room, RoomPhase
 from app.platform.room_manager import RoomManager
 from app.platform.stores.game_engine_store import GameEngineStore
@@ -23,19 +23,17 @@ from app.platform.stores.game_engine_store import GameEngineStore
 
 class GameSessionManager:
     """Owns starting/advancing a room's game — the bridge between RoomManager
-    (room lifecycle) and a game's GameEngine (phase/rules), via the
-    GameRegistry's engine_factory. Reusable by any future game: nothing here
-    is Mafia-specific.
+    (room lifecycle) and MafiaGameEngine (phase/rules). Mafia-specific: this
+    project's games are standalone deployments, not a shared multi-game
+    platform, so there's no benefit to a generic game lookup here.
     """
 
     def __init__(
         self,
         room_manager: RoomManager,
-        game_registry: GameRegistry,
         engine_store: GameEngineStore,
     ) -> None:
         self._room_manager = room_manager
-        self._game_registry = game_registry
         self._engine_store = engine_store
 
     async def start_game(self, room_code: str, requester_id: str) -> tuple[Room, list[Event]]:
@@ -45,18 +43,15 @@ class GameSessionManager:
         if room.phase != RoomPhase.LOBBY:
             raise GameAlreadyStartedError(f"Room {room_code!r} has already started")
 
-        module = self._game_registry.get(room.game_type)
-        if module is None:
-            raise ValueError(f"Unknown game type: {room.game_type!r}")
-        if room.active_player_count < module.min_players:
+        if room.active_player_count < MIN_PLAYERS:
             raise NotEnoughPlayersError(
-                f"{module.display_name} needs at least {module.min_players} players "
+                f"{DISPLAY_NAME} needs at least {MIN_PLAYERS} players "
                 f"(has {room.active_player_count})"
             )
 
         active_player_ids = [player.id for player in room.players.values() if not player.is_spectator]
 
-        engine = module.engine_factory(room_code)
+        engine = MafiaGameEngine(room_code)
         events = await engine.handle_command(
             StartGameCommand(player_id=requester_id, active_player_ids=active_player_ids)
         )
@@ -109,11 +104,7 @@ class GameSessionManager:
         return engine.role_for(player_id)
 
 
-# Importing app.games.mafia registers the Mafia module into game_registry
-# as a side effect. Every future game's package does the same on import.
-import app.games.mafia  # noqa: E402,F401
-from app.platform.game_registry import game_registry
 from app.platform.room_manager import room_manager
 from app.platform.stores.in_memory import InMemoryStore
 
-game_session_manager = GameSessionManager(room_manager, game_registry, GameEngineStore(InMemoryStore()))
+game_session_manager = GameSessionManager(room_manager, GameEngineStore(InMemoryStore()))

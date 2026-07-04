@@ -24,9 +24,9 @@ from app.platform.state_machine import StateMachine
 
 class MafiaGameEngine(GameEngine):
     """Drives Mafia's full phase sequence via the generic StateMachine. One
-    instance lives per active game (constructed by GameSessionManager via
-    the GameRegistry's engine_factory), so it holds its own in-memory state
-    rather than round-tripping through a store on every command.
+    instance lives per active game (constructed directly by
+    GameSessionManager), so it holds its own in-memory state rather than
+    round-tripping through a store on every command.
     """
 
     def __init__(self, room_code: str, rng: random.Random | None = None) -> None:
