@@ -5,6 +5,23 @@ import type { ClientCommand, RoleOut } from "@/types/ws-events";
 
 type ConnectionStatus = "idle" | "connecting" | "connected" | "closed";
 
+interface NightResult {
+  eliminatedPlayerId: string | null;
+}
+
+interface EliminationResult {
+  eliminatedPlayerId: string | null;
+}
+
+interface GameOverResult {
+  winningTeam: string;
+}
+
+interface InvestigationResult {
+  targetPlayerId: string;
+  team: string;
+}
+
 interface RoomStoreState {
   room: Room | null;
   selfPlayerId: string | null;
@@ -14,6 +31,11 @@ interface RoomStoreState {
   kicked: boolean;
   lastError: { code: string; message: string } | null;
   socket: RoomSocket | null;
+  nightResult: NightResult | null;
+  eliminationResult: EliminationResult | null;
+  gameOver: GameOverResult | null;
+  investigationResult: InvestigationResult | null;
+  votes: Record<string, string>;
   connect: (roomCode: string, playerId: string) => void;
   disconnect: () => void;
   sendCommand: (command: ClientCommand) => void;
@@ -28,6 +50,11 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   kicked: false,
   lastError: null,
   socket: null,
+  nightResult: null,
+  eliminationResult: null,
+  gameOver: null,
+  investigationResult: null,
+  votes: {},
 
   connect: (roomCode, playerId) => {
     get().socket?.close();
@@ -37,9 +64,16 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       onClose: (event) => set({ status: "closed", closeCode: event.code }),
       onEvent: (event) => {
         switch (event.type) {
-          case "room_state":
-            set({ room: event.room });
+          case "room_state": {
+            const startingNewRound = event.room.game_state?.phase === "night";
+            set({
+              room: event.room,
+              ...(startingNewRound
+                ? { nightResult: null, eliminationResult: null, investigationResult: null, votes: {} }
+                : {}),
+            });
             break;
+          }
           case "player_connection_changed":
             set((state) => {
               if (!state.room) return state;
@@ -64,6 +98,21 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
           case "role_assigned":
             set({ myRole: event.role });
             break;
+          case "investigation_result":
+            set({ investigationResult: { targetPlayerId: event.target_player_id, team: event.team } });
+            break;
+          case "night_result":
+            set({ nightResult: { eliminatedPlayerId: event.eliminated_player_id } });
+            break;
+          case "elimination_result":
+            set({ eliminationResult: { eliminatedPlayerId: event.eliminated_player_id } });
+            break;
+          case "game_over":
+            set({ gameOver: { winningTeam: event.winning_team } });
+            break;
+          case "vote_cast":
+            set((state) => ({ votes: { ...state.votes, [event.player_id]: event.target_player_id } }));
+            break;
           case "pong":
             break;
         }
@@ -79,6 +128,11 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       kicked: false,
       lastError: null,
       socket,
+      nightResult: null,
+      eliminationResult: null,
+      gameOver: null,
+      investigationResult: null,
+      votes: {},
     });
     socket.connect();
   },

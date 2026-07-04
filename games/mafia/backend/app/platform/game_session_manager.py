@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from app.game_engine.base import Event
-from app.games.mafia.commands import AdvancePhaseCommand, StartGameCommand
+from app.games.mafia.commands import (
+    AdvancePhaseCommand,
+    CastVoteCommand,
+    StartGameCommand,
+    SubmitNightActionCommand,
+)
 from app.platform.exceptions import (
     GameAlreadyStartedError,
     GameNotStartedError,
@@ -70,6 +75,22 @@ class GameSessionManager:
             raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
 
         return await engine.handle_command(AdvancePhaseCommand(player_id=requester_id))
+
+    async def submit_night_action(self, room_code: str, player_id: str, target_player_id: str) -> list[Event]:
+        engine = await self._engine_store.get(room_code)
+        if engine is None:
+            raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
+
+        return await engine.handle_command(
+            SubmitNightActionCommand(player_id=player_id, target_player_id=target_player_id)
+        )
+
+    async def cast_vote(self, room_code: str, player_id: str, target_player_id: str) -> list[Event]:
+        engine = await self._engine_store.get(room_code)
+        if engine is None:
+            raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
+
+        return await engine.handle_command(CastVoteCommand(player_id=player_id, target_player_id=target_player_id))
 
     async def get_phase_snapshot(self, room_code: str) -> dict[str, object] | None:
         engine = await self._engine_store.get(room_code)

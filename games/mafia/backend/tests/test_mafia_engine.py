@@ -71,4 +71,8 @@ def test_phase_snapshot_matches_current_state():
     engine = MafiaGameEngine("ABCDE")
     asyncio.run(engine.handle_command(StartGameCommand(player_id="host", active_player_ids=_PLAYERS)))
 
-    assert engine.phase_snapshot() == {"phase": "night", "round_number": 1}
+    assert engine.phase_snapshot() == {
+        "phase": "night",
+        "round_number": 1,
+        "alive_player_ids": sorted(_PLAYERS),
+    }

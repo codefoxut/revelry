@@ -41,13 +41,45 @@ export interface RoleAssignedEvent {
   role: RoleOut;
 }
 
+export interface InvestigationResultEvent {
+  type: "investigation_result";
+  target_player_id: string;
+  team: string;
+}
+
+export interface NightResultEvent {
+  type: "night_result";
+  eliminated_player_id: string | null;
+}
+
+export interface EliminationResultEvent {
+  type: "elimination_result";
+  eliminated_player_id: string | null;
+}
+
+export interface GameOverEvent {
+  type: "game_over";
+  winning_team: string;
+}
+
+export interface VoteCastEvent {
+  type: "vote_cast";
+  player_id: string;
+  target_player_id: string;
+}
+
 export type ServerEvent =
   | RoomStateEvent
   | PlayerConnectionChangedEvent
   | ErrorEvent
   | PongEvent
   | KickedEvent
-  | RoleAssignedEvent;
+  | RoleAssignedEvent
+  | InvestigationResultEvent
+  | NightResultEvent
+  | EliminationResultEvent
+  | GameOverEvent
+  | VoteCastEvent;
 
 // ---- Client -> Server ----
 
@@ -83,6 +115,16 @@ export interface AdvancePhaseCommand {
   type: "advance_phase";
 }
 
+export interface NightActionCommand {
+  type: "night_action";
+  target_player_id: string;
+}
+
+export interface CastVoteCommand {
+  type: "cast_vote";
+  target_player_id: string;
+}
+
 export type ClientCommand =
   | PingCommand
   | SetReadyCommand
@@ -90,4 +132,6 @@ export type ClientCommand =
   | KickPlayerCommand
   | LeaveRoomCommand
   | StartGameCommand
-  | AdvancePhaseCommand;
+  | AdvancePhaseCommand
+  | NightActionCommand
+  | CastVoteCommand;

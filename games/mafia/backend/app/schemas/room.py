@@ -42,6 +42,7 @@ class GameStateOut(BaseModel):
 
     phase: str
     round_number: int
+    alive_player_ids: list[str] = []
 
 
 class RoomOut(BaseModel):

@@ -2,11 +2,7 @@ from enum import Enum
 
 
 class MafiaPhase(str, Enum):
-    """Mafia's own phase sequence, driven by the generic StateMachine.
-
-    Role actions/voting/win-checking are later steps (10/11) — this step
-    only owns legal phase transitions.
-    """
+    """Mafia's own phase sequence, driven by the generic StateMachine."""
 
     LOBBY = "lobby"
     NIGHT = "night"
@@ -16,11 +12,13 @@ class MafiaPhase(str, Enum):
     GAME_OVER = "game_over"
 
 
-# ELIMINATION -> GAME_OVER is structurally legal here, but nothing drives
-# that transition yet — step 11's win-check decides NIGHT vs GAME_OVER.
+# NIGHT -> GAME_OVER: a night kill can end the game immediately (e.g. the
+# mafia's kill reaches parity with the town) without waiting for a day/vote
+# cycle that no longer matters.
+# ELIMINATION -> GAME_OVER: the win-check that runs after a day's lynch.
 MAFIA_TRANSITIONS: dict[MafiaPhase, set[MafiaPhase]] = {
     MafiaPhase.LOBBY: {MafiaPhase.NIGHT},
-    MafiaPhase.NIGHT: {MafiaPhase.DAY},
+    MafiaPhase.NIGHT: {MafiaPhase.DAY, MafiaPhase.GAME_OVER},
     MafiaPhase.DAY: {MafiaPhase.VOTING},
     MafiaPhase.VOTING: {MafiaPhase.ELIMINATION},
     MafiaPhase.ELIMINATION: {MafiaPhase.NIGHT, MafiaPhase.GAME_OVER},

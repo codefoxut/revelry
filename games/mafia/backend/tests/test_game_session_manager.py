@@ -59,7 +59,9 @@ def test_start_game_moves_room_to_in_game_and_night_phase(sessions):
     assert updated_room.phase == RoomPhase.IN_GAME
     assert events[0].phase.value == "night"
     snapshot = asyncio.run(game_sessions.get_phase_snapshot(room.code))
-    assert snapshot == {"phase": "night", "round_number": 1}
+    assert snapshot["phase"] == "night"
+    assert snapshot["round_number"] == 1
+    assert set(snapshot["alive_player_ids"]) == set(updated_room.players.keys())
 
 
 def test_start_game_twice_is_rejected(sessions):

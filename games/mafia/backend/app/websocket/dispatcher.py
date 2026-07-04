@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from app.games.mafia.events import (
+    EliminationResultEvent as EngineEliminationResultEvent,
+    GameOverEvent as EngineGameOverEvent,
+    InvestigationResultEvent as EngineInvestigationResultEvent,
+    NightResultEvent as EngineNightResultEvent,
+)
 from app.games.mafia.events import RoleAssignedEvent as EngineRoleAssignedEvent
 from app.platform.exceptions import (
     GameAlreadyStartedError,
@@ -12,7 +18,18 @@ from app.platform.exceptions import (
 from app.platform.game_session_manager import GameSessionManager
 from app.platform.room_manager import RoomManager
 from app.schemas.room import RoleOut
-from app.schemas.ws_events import ErrorEvent, KickedEvent, PongEvent, RoleAssignedEvent, RoomStateEvent
+from app.schemas.ws_events import (
+    EliminationResultEvent,
+    ErrorEvent,
+    GameOverEvent,
+    InvestigationResultEvent,
+    KickedEvent,
+    NightResultEvent,
+    PongEvent,
+    RoleAssignedEvent,
+    RoomStateEvent,
+    VoteCastEvent,
+)
 from app.services.room_presenter import to_room_out
 from app.websocket.connection_manager import ConnectionManager
 
@@ -66,6 +83,14 @@ async def dispatch_client_event(
 
     if event_type == "advance_phase":
         await _handle_advance_phase(room_code, player_id, room_manager, game_session_manager, connection_manager)
+        return False
+
+    if event_type == "night_action":
+        await _handle_night_action(raw_event, room_code, player_id, game_session_manager, connection_manager)
+        return False
+
+    if event_type == "cast_vote":
+        await _handle_cast_vote(raw_event, room_code, player_id, game_session_manager, connection_manager)
         return False
 
     await _send_error(connection_manager, room_code, player_id, "unknown_event", f"Unrecognized event type: {event_type!r}")
@@ -194,7 +219,7 @@ async def _handle_advance_phase(
     connection_manager: ConnectionManager,
 ) -> None:
     try:
-        await game_session_manager.advance_phase(room_code, player_id)
+        events = await game_session_manager.advance_phase(room_code, player_id)
     except PermissionDeniedError as exc:
         await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
         return
@@ -205,7 +230,73 @@ async def _handle_advance_phase(
         await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
         return
 
+    for event in events:
+        if isinstance(event, EngineNightResultEvent):
+            await connection_manager.broadcast(
+                room_code, NightResultEvent(eliminated_player_id=event.eliminated_player_id)
+            )
+        elif isinstance(event, EngineEliminationResultEvent):
+            await connection_manager.broadcast(
+                room_code, EliminationResultEvent(eliminated_player_id=event.eliminated_player_id)
+            )
+        elif isinstance(event, EngineGameOverEvent):
+            await connection_manager.broadcast(room_code, GameOverEvent(winning_team=event.winning_team))
+
     await _broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
+
+
+async def _handle_night_action(
+    raw_event: dict,
+    room_code: str,
+    player_id: str,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+) -> None:
+    target_id = raw_event.get("target_player_id")
+    if not target_id:
+        await _send_error(connection_manager, room_code, player_id, "invalid_payload", "`target_player_id` is required")
+        return
+
+    try:
+        events = await game_session_manager.submit_night_action(room_code, player_id, target_id)
+    except GameNotStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except InvalidGameStateError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
+        return
+
+    for event in events:
+        if isinstance(event, EngineInvestigationResultEvent):
+            await connection_manager.send_to_player(
+                room_code,
+                event.player_id,
+                InvestigationResultEvent(target_player_id=event.target_player_id, team=event.team),
+            )
+
+
+async def _handle_cast_vote(
+    raw_event: dict,
+    room_code: str,
+    player_id: str,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+) -> None:
+    target_id = raw_event.get("target_player_id")
+    if not target_id:
+        await _send_error(connection_manager, room_code, player_id, "invalid_payload", "`target_player_id` is required")
+        return
+
+    try:
+        await game_session_manager.cast_vote(room_code, player_id, target_id)
+    except GameNotStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except InvalidGameStateError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
+        return
+
+    await connection_manager.broadcast(room_code, VoteCastEvent(player_id=player_id, target_player_id=target_id))
 
 
 async def _broadcast_room_state(

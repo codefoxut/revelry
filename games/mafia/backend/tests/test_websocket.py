@@ -211,7 +211,10 @@ def test_start_game_with_enough_players_broadcasts_night_phase(isolated_manager)
     assert role_event["role"]["key"] in {"villager", "mafia", "detective", "doctor"}
     assert update["type"] == "room_state"
     assert update["room"]["phase"] == "in_game"
-    assert update["room"]["game_state"] == {"phase": "night", "round_number": 1}
+    game_state = update["room"]["game_state"]
+    assert game_state["phase"] == "night"
+    assert game_state["round_number"] == 1
+    assert set(game_state["alive_player_ids"]) == {p["id"] for p in update["room"]["players"]}
 
 
 def test_start_game_delivers_a_role_to_every_player_privately(isolated_manager):
@@ -289,9 +292,14 @@ def test_advance_phase_cycles_and_broadcasts(isolated_manager):
         socket.receive_json()  # room_state: night, round 1
 
         socket.send_json({"type": "advance_phase"})
+        night_result = socket.receive_json()  # no mafia vote cast -> no kill
         day_update = socket.receive_json()
 
-    assert day_update["room"]["game_state"] == {"phase": "day", "round_number": 1}
+    assert night_result["type"] == "night_result"
+    assert night_result["eliminated_player_id"] is None
+    game_state = day_update["room"]["game_state"]
+    assert game_state["phase"] == "day"
+    assert game_state["round_number"] == 1
 
 
 def test_reconnect_after_start_resends_own_role(isolated_manager):

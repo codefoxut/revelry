@@ -18,3 +18,21 @@ class AdvancePhaseCommand(Command):
     """Manually advance to the next phase in the cycle. A stand-in for
     automatic timer/vote-driven advancement, which lands in later steps.
     """
+
+
+class SubmitNightActionCommand(Command):
+    """A single player's night action. What it means depends on the
+    actor's role: mafia = kill vote, doctor = protect, detective =
+    investigate. Only valid during NIGHT, for a living player whose role
+    has `acts_at_night`.
+    """
+
+    target_player_id: str
+
+
+class CastVoteCommand(Command):
+    """A living player's public vote to eliminate another living player
+    during VOTING. Re-voting overwrites the player's previous vote.
+    """
+
+    target_player_id: str

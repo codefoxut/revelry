@@ -50,6 +50,43 @@ class RoleAssignedEvent(BaseModel):
     role: RoleOut
 
 
+class InvestigationResultEvent(BaseModel):
+    """The detective's own investigation result — sent only to them."""
+
+    type: Literal["investigation_result"] = "investigation_result"
+    target_player_id: str
+    team: str
+
+
+class NightResultEvent(BaseModel):
+    """Public announcement of who (if anyone) died overnight."""
+
+    type: Literal["night_result"] = "night_result"
+    eliminated_player_id: str | None
+
+
+class EliminationResultEvent(BaseModel):
+    """Public announcement of who (if anyone) the town voted out."""
+
+    type: Literal["elimination_result"] = "elimination_result"
+    eliminated_player_id: str | None
+
+
+class GameOverEvent(BaseModel):
+    type: Literal["game_over"] = "game_over"
+    winning_team: str
+
+
+class VoteCastEvent(BaseModel):
+    """A single public vote during the day. Votes are open, so this is
+    broadcast to the whole room as each one comes in.
+    """
+
+    type: Literal["vote_cast"] = "vote_cast"
+    player_id: str
+    target_player_id: str
+
+
 # ---- Client -> Server ----
 # Parsed by hand in the dispatcher (looking at the raw `type` field) rather
 # than a discriminated union — keeps adding a command a one-line diff in the
@@ -95,3 +132,19 @@ class AdvancePhaseCommand(BaseModel):
     """
 
     type: Literal["advance_phase"] = "advance_phase"
+
+
+class NightActionCommand(BaseModel):
+    """A living player's night action. Meaning depends on their role; the
+    engine validates phase/alive/role, not this layer.
+    """
+
+    type: Literal["night_action"] = "night_action"
+    target_player_id: str
+
+
+class CastVoteCommand(BaseModel):
+    """A living player's public vote during VOTING."""
+
+    type: Literal["cast_vote"] = "cast_vote"
+    target_player_id: str

@@ -11,6 +11,7 @@ export interface Player {
 export interface GameState {
   phase: string;
   round_number: number;
+  alive_player_ids: string[];
 }
 
 export interface Room {
