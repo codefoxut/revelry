@@ -9,6 +9,9 @@ FRONTEND_DIR := frontend
 VENV := $(BACKEND_DIR)/.venv
 PYTHON := $(VENV)/bin/python
 
+BACKEND_PORT ?= 8000
+FRONTEND_PORT ?= 3000
+
 install: install-backend install-frontend
 
 install-backend:
@@ -22,10 +25,10 @@ dev:
 	$(MAKE) -j2 dev-backend dev-frontend
 
 dev-backend:
-	cd $(BACKEND_DIR) && .venv/bin/uvicorn app.main:app --reload --port 8000
+	cd $(BACKEND_DIR) && .venv/bin/uvicorn app.main:app --reload --port $(BACKEND_PORT)
 
 dev-frontend:
-	cd $(FRONTEND_DIR) && npm run dev
+	cd $(FRONTEND_DIR) && npm run dev -- -p $(FRONTEND_PORT)
 
 test: test-backend test-frontend
 
