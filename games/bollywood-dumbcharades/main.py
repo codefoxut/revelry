@@ -1,14 +1,19 @@
 import json
+import os
 import random
 from pathlib import Path
 from typing import List, Optional
 
+import anthropic
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import movie_db
+
+load_dotenv()
 
 app = FastAPI(title="Bollywood Dumb Charades")
 
@@ -21,6 +26,57 @@ MIN_TEAMS = 2
 MAX_TEAMS = 8
 MIN_PLAYERS = 3
 MAX_PLAYERS = 5
+
+MOVIE_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "year": {"type": "integer"},
+        "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
+        "mime_hint": {"type": "string"},
+    },
+    "required": ["title", "year", "difficulty", "mime_hint"],
+    "additionalProperties": False,
+}
+
+
+def online_mode_available() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
+
+
+def generate_online_movie(used_titles: List[str]) -> dict:
+    """Ask Claude for one dumb-charades-ready Bollywood movie, live.
+
+    Used only in online mode, as an alternative to sampling data/movies.db.
+    """
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    avoid = ", ".join(used_titles) if used_titles else "none yet"
+    response = client.messages.create(
+        model="claude-opus-4-8",
+        max_tokens=300,
+        output_config={
+            "effort": "low",
+            "format": {"type": "json_schema", "schema": MOVIE_JSON_SCHEMA},
+        },
+        messages=[{
+            "role": "user",
+            "content": (
+                "Suggest one real Bollywood movie for a game of dumb charades. "
+                "It must be short/iconic enough to mime in under a minute, have "
+                "a concrete recognizable object/action/scene, and be well known. "
+                f"Do not suggest any of these already-used titles: {avoid}."
+            ),
+        }],
+    )
+    text = next(b.text for b in response.content if b.type == "text")
+    data = json.loads(text)
+    return {
+        "id": movie_db.slugify(data["title"]),
+        "title": data["title"],
+        "year": data["year"],
+        "difficulty": data["difficulty"],
+        "mime_hint": data["mime_hint"],
+    }
 
 
 def sample_movie_pool(limit: int = MOVIE_POOL_SIZE) -> List[dict]:
@@ -66,14 +122,16 @@ def delete_session(session_id: str) -> None:
         path.unlink()
 
 
-def new_state(participant_names: List[str], mode: str) -> dict:
+def new_state(participant_names: List[str], mode: str, movie_source: str) -> dict:
     teams = [{"id": f"t{i}", "name": name} for i, name in enumerate(participant_names)]
     return {
         "mode": mode,
+        "movie_source": movie_source,
         "teams": teams,
         "scores": {t["id"]: 0 for t in teams},
         "turn_index": 0,
-        "pool": sample_movie_pool(),
+        "pool": sample_movie_pool() if movie_source == "offline" else [],
+        "used_titles": [],
         "current": None,
         "pending_steal": False,
         "status": "playing",
@@ -99,6 +157,7 @@ class StartRequest(BaseModel):
     session_id: str
     teams: List[str]
     mode: str = "teams"  # "teams" | "individual"
+    movie_source: str = "offline"  # "offline" | "online"
 
 
 class ResolveRequest(BaseModel):
@@ -118,11 +177,22 @@ async def start_game(req: StartRequest):
             status_code=400,
             detail=f"Need between {lo} and {hi} {noun}",
         )
+    movie_source = req.movie_source if req.movie_source in ("offline", "online") else "offline"
+    if movie_source == "online" and not online_mode_available():
+        raise HTTPException(
+            status_code=400,
+            detail="Online mode requires ANTHROPIC_API_KEY to be configured",
+        )
     label = "Team" if mode == "teams" else "Player"
     participant_names = [name.strip() or f"{label} {i + 1}" for i, name in enumerate(req.teams)]
-    state = new_state(participant_names, mode)
+    state = new_state(participant_names, mode, movie_source)
     save_session(req.session_id, state)
     return state
+
+
+@app.get("/config")
+async def get_config():
+    return {"online_mode_available": online_mode_available()}
 
 
 @app.get("/state/{session_id}")
@@ -142,10 +212,22 @@ async def reveal_movie(session_id: str):
         raise HTTPException(status_code=400, detail="Game already finished")
     if state["current"] is not None:
         raise HTTPException(status_code=400, detail="A movie is already revealed")
-    if not state["pool"]:
-        raise HTTPException(status_code=400, detail="No movies left in the pool")
 
-    state["current"] = state["pool"].pop(0)
+    if state.get("movie_source", "offline") == "online":
+        try:
+            movie = generate_online_movie(state.get("used_titles", []))
+        except Exception:
+            raise HTTPException(
+                status_code=502,
+                detail="Could not reach Claude to pick a movie. Try again.",
+            )
+        state["current"] = movie
+        state.setdefault("used_titles", []).append(movie["title"])
+    else:
+        if not state["pool"]:
+            raise HTTPException(status_code=400, detail="No movies left in the pool")
+        state["current"] = state["pool"].pop(0)
+
     save_session(session_id, state)
     return state
 
