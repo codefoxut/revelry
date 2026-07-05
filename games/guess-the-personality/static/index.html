@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🕵️ Guess the Personality</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold: #F2C94C;
+      --pale-gold: #F7E3A1;
+      --violet: #6C4AB6;
+      --deep-violet: #3A2166;
+      --ink: #0E0B1E;
+      --deep-ink: #07050F;
+      --spotlight: #FFE9A8;
+      --panel: rgba(28, 18, 54, 0.85);
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+      background-color: var(--deep-ink);
+      color: var(--pale-gold);
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      background-image:
+        radial-gradient(ellipse 70% 45% at 50% 0%, rgba(108, 74, 182, 0.35) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 40% at 15% 80%, rgba(242, 201, 76, 0.08) 0%, transparent 55%),
+        radial-gradient(ellipse 60% 40% at 90% 60%, rgba(58, 33, 102, 0.4) 0%, transparent 60%);
+    }
+
+    /* ─── HEADER ──────────────────────────────────────── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: linear-gradient(180deg, #0e0b1e 0%, #180f30 100%);
+      border-bottom: 1px solid rgba(242, 201, 76, 0.3);
+      box-shadow: 0 2px 24px rgba(108, 74, 182, 0.35);
+    }
+
+    .spot-strip {
+      display: flex;
+      justify-content: space-evenly;
+      height: 3px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--gold) 0px, var(--gold) 14px,
+        transparent 14px, transparent 28px
+      );
+      opacity: 0.5;
+    }
+
+    .header-body {
+      padding: 12px 16px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+      max-width: 740px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .title-block { display: flex; flex-direction: column; gap: 1px; }
+
+    .game-title {
+      font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 1px;
+      text-shadow: 0 0 14px rgba(242, 201, 76, 0.5);
+      line-height: 1;
+    }
+
+    .game-subtitle {
+      font-size: 0.6rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--violet);
+      filter: brightness(1.6);
+      font-style: italic;
+      opacity: 0.85;
+    }
+
+    .score-badge {
+      font-family: "Courier New", monospace;
+      font-size: clamp(0.7rem, 1.8vw, 0.82rem);
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(242, 201, 76, 0.35);
+      color: var(--pale-gold);
+      padding: 5px 12px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      transition: opacity 0.3s;
+    }
+    .score-badge.hidden { opacity: 0; pointer-events: none; }
+
+    .new-game-btn {
+      background: var(--violet);
+      color: var(--pale-gold);
+      border: 1px solid rgba(242, 201, 76, 0.45);
+      padding: 6px 13px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .new-game-btn:hover { background: #5a3d9c; box-shadow: 0 0 14px rgba(242, 201, 76, 0.4); }
+    .new-game-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ─── DIVIDER ─────────────────────────────────────── */
+    .marquee-divider {
+      height: 4px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--gold) 0px, var(--gold) 6px,
+        var(--violet) 6px, var(--violet) 12px
+      );
+      opacity: 0.8;
+    }
+
+    /* ─── CHAT AREA ───────────────────────────────────── */
+    .chat-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+    .chat-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 22px 16px 10px;
+      max-width: 740px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+    .chat-scroll::-webkit-scrollbar { width: 3px; }
+    .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(242, 201, 76, 0.25); border-radius: 2px; }
+
+    /* ─── MESSAGES ────────────────────────────────────── */
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 82%;
+      animation: msgIn 0.28s cubic-bezier(.17,.67,.46,1) both;
+    }
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .message.host { align-self: flex-start; }
+    .message.user { align-self: flex-end; align-items: flex-end; }
+
+    .msg-label {
+      font-size: 0.6rem;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      opacity: 0.65;
+    }
+    .message.host .msg-label { color: var(--gold); }
+    .message.user .msg-label { color: var(--violet); filter: brightness(1.7); }
+
+    .bubble { padding: 13px 17px; line-height: 1.65; font-size: 0.93rem; position: relative; }
+
+    .message.host .bubble {
+      background: linear-gradient(135deg, #201540 0%, #140c28 100%);
+      border: 1px solid rgba(242, 201, 76, 0.3);
+      border-left: 3px solid var(--gold);
+      border-radius: 0 10px 10px 2px;
+      color: var(--pale-gold);
+      box-shadow: 0 3px 18px rgba(0,0,0,0.5);
+    }
+    .message.host .bubble strong { color: var(--gold); }
+    .message.host .bubble em { color: var(--spotlight); font-style: italic; }
+
+    .message.user .bubble {
+      background: linear-gradient(135deg, #6C4AB6 0%, #45307A 100%);
+      border: 1px solid rgba(242, 201, 76, 0.25);
+      border-right: 3px solid var(--gold);
+      border-radius: 10px 2px 0 10px;
+      color: #fff;
+      box-shadow: 0 3px 18px rgba(108, 74, 182, 0.4);
+    }
+
+    /* ─── TYPING ──────────────────────────────────────── */
+    .typing-wrap {
+      align-self: flex-start;
+      padding: 13px 18px;
+      background: linear-gradient(135deg, #201540 0%, #140c28 100%);
+      border: 1px solid rgba(242, 201, 76, 0.3);
+      border-left: 3px solid var(--gold);
+      border-radius: 0 10px 10px 2px;
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      animation: msgIn 0.25s ease both;
+    }
+    .tdot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); animation: tdot 1.3s ease-in-out infinite; }
+    .tdot:nth-child(2) { animation-delay: 0.18s; }
+    .tdot:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes tdot {
+      0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1.3); }
+    }
+
+    /* ─── SPLASH ──────────────────────────────────────── */
+    .splash { text-align: center; padding: 40px 20px; color: rgba(247, 227, 161, 0.25); font-style: italic; font-size: 0.9rem; user-select: none; }
+    .splash .stars { font-size: 1.4rem; letter-spacing: 10px; display: block; margin-bottom: 10px; opacity: 0.4; }
+
+    /* ─── INPUT AREA ──────────────────────────────────── */
+    .input-area { padding: 12px 16px 16px; background: linear-gradient(0deg, #07050f 70%, transparent); flex-shrink: 0; }
+
+    .input-inner {
+      max-width: 740px;
+      margin: 0 auto;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      background: rgba(20, 12, 40, 0.9);
+      border: 1.5px solid rgba(242, 201, 76, 0.35);
+      border-radius: 8px;
+      padding: 8px 8px 8px 14px;
+      box-shadow: 0 0 30px rgba(108, 74, 182, 0.25);
+    }
+    .input-inner:focus-within {
+      border-color: rgba(242, 201, 76, 0.65);
+      box-shadow: 0 0 30px rgba(108, 74, 182, 0.3), 0 0 0 2px rgba(242, 201, 76, 0.1);
+    }
+
+    .chat-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--pale-gold);
+      font-family: inherit;
+      font-size: 0.93rem;
+      line-height: 1.5;
+      padding: 6px 0;
+      resize: none;
+      caret-color: var(--gold);
+      min-height: 36px;
+      max-height: 110px;
+      overflow-y: auto;
+    }
+    .chat-input::placeholder { color: rgba(247, 227, 161, 0.28); font-style: italic; }
+
+    .send-btn {
+      background: linear-gradient(135deg, var(--violet) 0%, #3A2166 100%);
+      color: var(--gold);
+      border: 1.5px solid rgba(242, 201, 76, 0.4);
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.18s;
+    }
+    .send-btn:hover { background: linear-gradient(135deg, #7d57cf 0%, var(--violet) 100%); box-shadow: 0 0 16px rgba(242, 201, 76, 0.45); transform: scale(1.06); }
+    .send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* ─── TEAM NAME MODAL ────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 3, 12, 0.88);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.25s ease;
+    }
+    .modal-overlay.hidden { display: none; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal {
+      background: linear-gradient(160deg, #1c1236 0%, #120a24 60%, #180f30 100%);
+      border: 1px solid rgba(242, 201, 76, 0.45);
+      border-radius: 12px;
+      padding: 32px 28px 28px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 0 60px rgba(108, 74, 182, 0.4), 0 0 0 1px rgba(242,201,76,0.1);
+      animation: slideUp 0.3s cubic-bezier(.17,.67,.46,1);
+      position: relative;
+      overflow: hidden;
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+    .modal::before, .modal::after {
+      content: '✦';
+      position: absolute;
+      color: rgba(242, 201, 76, 0.25);
+      font-size: 1.4rem;
+    }
+    .modal::before { top: 12px; left: 16px; }
+    .modal::after  { bottom: 12px; right: 16px; }
+
+    .modal-title {
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .modal-title h2 {
+      font-size: 1.3rem;
+      color: var(--gold);
+      letter-spacing: 1px;
+      text-shadow: 0 0 16px rgba(242,201,76,0.5);
+    }
+    .modal-title p {
+      font-size: 0.72rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--violet);
+      filter: brightness(1.7);
+      opacity: 0.8;
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    .modal-divider {
+      height: 2px;
+      background: repeating-linear-gradient(90deg,
+        var(--gold) 0, var(--gold) 6px,
+        var(--violet) 6px, var(--violet) 12px
+      );
+      margin: 16px 0 24px;
+      border-radius: 1px;
+      opacity: 0.7;
+    }
+
+    .team-field { margin-bottom: 18px; }
+    .team-field label {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(242, 201, 76, 0.65);
+      margin-bottom: 7px;
+    }
+    .team-field label span { margin-right: 6px; }
+
+    .team-input {
+      width: 100%;
+      background: rgba(0,0,0,0.35);
+      border: 1.5px solid rgba(242, 201, 76, 0.3);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: var(--pale-gold);
+      font-family: inherit;
+      font-size: 1rem;
+      outline: none;
+      caret-color: var(--gold);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .team-input:focus {
+      border-color: rgba(242, 201, 76, 0.7);
+      box-shadow: 0 0 0 3px rgba(242, 201, 76, 0.08);
+    }
+    .team-input::placeholder { color: rgba(247,227,161,0.25); font-style: italic; }
+
+    .modal-start-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--violet) 0%, #3A2166 100%);
+      color: var(--pale-gold);
+      border: 1.5px solid rgba(242, 201, 76, 0.45);
+      border-radius: 7px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    .modal-start-btn:hover {
+      background: linear-gradient(135deg, #7d57cf 0%, var(--violet) 100%);
+      box-shadow: 0 0 20px rgba(242, 201, 76, 0.35);
+      transform: translateY(-1px);
+    }
+    .modal-start-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ─── RESPONSIVE ──────────────────────────────────── */
+    @media (max-width: 500px) {
+      .game-subtitle { display: none; }
+      .score-badge { font-size: 0.68rem; padding: 4px 8px; }
+      .message { max-width: 90%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TEAM NAME MODAL -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-title">
+        <h2>🕵️ Guess the Personality</h2>
+        <p>★ enter your team names ★</p>
+      </div>
+      <div class="modal-divider"></div>
+
+      <div class="team-field">
+        <label><span>🔴</span> Team One</label>
+        <input
+          class="team-input"
+          id="teamAInput"
+          type="text"
+          maxlength="24"
+          placeholder="e.g. Master Detectives"
+          onkeydown="if(event.key==='Enter') document.getElementById('teamBInput').focus()"
+        />
+      </div>
+
+      <div class="team-field">
+        <label><span>🔵</span> Team Two</label>
+        <input
+          class="team-input"
+          id="teamBInput"
+          type="text"
+          maxlength="24"
+          placeholder="e.g. Sherlock Squad"
+          onkeydown="if(event.key==='Enter') startWithTeams()"
+        />
+      </div>
+
+      <button class="modal-start-btn" id="modalStartBtn" onclick="startWithTeams()">
+        🔎 Let's Play!
+      </button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="spot-strip"></div>
+    <div class="header-body">
+      <div class="title-block">
+        <div class="game-title">🕵️ Guess the Personality</div>
+        <div class="game-subtitle">★ who am i? ★</div>
+      </div>
+      <div class="score-badge hidden" id="scoreBadge">A: 0 | B: 0</div>
+      <button class="new-game-btn" id="newGameBtn" onclick="newGame()">🔄 New Game</button>
+    </div>
+  </header>
+
+  <div class="marquee-divider"></div>
+
+  <!-- CHAT -->
+  <div class="chat-wrap">
+    <div class="chat-scroll" id="chatScroll">
+      <div class="splash" id="splash">
+        <span class="stars">✦ ✦ ✦</span>
+        Who could it be? Enter your teams to begin…
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-area">
+    <div class="input-inner">
+      <textarea
+        class="chat-input"
+        id="chatInput"
+        placeholder="Type your guess, or ask for another clue… press Enter to send"
+        rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Send">➤</button>
+    </div>
+  </div>
+
+<script>
+  /* ── SESSION (persisted in localStorage) ── */
+  function newUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  let sessionId = localStorage.getItem('gtp_session_id');
+  if (!sessionId) {
+    sessionId = newUUID();
+    localStorage.setItem('gtp_session_id', sessionId);
+  }
+
+  let isLoading = false;
+  const container = document.getElementById('chatScroll');
+
+  /* ══════════════════════════════════════════════════
+     CHAT
+  ══════════════════════════════════════════════════ */
+
+  function parseMarkdown(raw) {
+    let t = raw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/_(.*?)_/g, '<em>$1</em>');
+    t = t.replace(/\n/g, '<br>');
+    return t;
+  }
+
+  /* ── TEAM NAMES (in-memory + localStorage cache) ── */
+  let teamA = localStorage.getItem('gtp_team_a') || 'Team A';
+  let teamB = localStorage.getItem('gtp_team_b') || 'Team B';
+
+  function saveTeamNames(a, b) {
+    teamA = a; teamB = b;
+    localStorage.setItem('gtp_team_a', a);
+    localStorage.setItem('gtp_team_b', b);
+  }
+
+  function extractScore(text) {
+    // Match "Score → <anything>: N | <anything>: N"
+    const m = text.match(/Score\s*[→\-:]+\s*(.+?):\s*(\d+)\s*\|\s*(.+?):\s*(\d+)/i);
+    return m ? { labelA: m[1].trim(), a: m[2], labelB: m[3].trim(), b: m[4] } : null;
+  }
+
+  function updateScoreUI(text) {
+    const s = extractScore(text);
+    if (!s) return;
+    const el = document.getElementById('scoreBadge');
+    el.textContent = `${s.labelA}: ${s.a} | ${s.labelB}: ${s.b}`;
+    el.classList.remove('hidden');
+  }
+
+  function removeSplash() {
+    const sp = document.getElementById('splash');
+    if (sp) sp.remove();
+  }
+
+  function addMessage(role, text) {
+    removeSplash();
+    const wrap = document.createElement('div');
+    wrap.className = `message ${role}`;
+
+    const label = document.createElement('div');
+    label.className = 'msg-label';
+    label.textContent = role === 'host' ? '🎙️ Game Host' : '👤 You';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if (role === 'host') {
+      bubble.innerHTML = parseMarkdown(text);
+      updateScoreUI(text);
+    } else {
+      bubble.textContent = text;
+    }
+
+    wrap.appendChild(label);
+    wrap.appendChild(bubble);
+    container.appendChild(wrap);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  let typingEl = null;
+  function showTyping() {
+    removeSplash();
+    typingEl = document.createElement('div');
+    typingEl.className = 'typing-wrap';
+    typingEl.innerHTML = '<div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>';
+    container.appendChild(typingEl);
+    container.scrollTop = container.scrollHeight;
+  }
+  function hideTyping() {
+    if (typingEl) { typingEl.remove(); typingEl = null; }
+  }
+
+  async function callChat(message) {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, message })
+    });
+    if (!res.ok) throw new Error('Server error');
+    const d = await res.json();
+    saveTeamNames(d.team_a, d.team_b);
+    return d.reply;
+  }
+
+  async function sendMessage() {
+    const inp = document.getElementById('chatInput');
+    const text = inp.value.trim();
+    if (!text || isLoading) return;
+    inp.value = '';
+    inp.style.height = 'auto';
+    addMessage('user', text);
+    await dispatch(text);
+  }
+
+  async function dispatch(text) {
+    const btn = document.getElementById('sendBtn');
+    isLoading = true;
+    btn.disabled = true;
+    document.getElementById('newGameBtn').disabled = true;
+    showTyping();
+    try {
+      const reply = await callChat(text);
+      hideTyping();
+      addMessage('host', reply);
+    } catch (e) {
+      hideTyping();
+      addMessage('host', '⚠️ Connection hiccup! Check the server and try again.');
+    } finally {
+      isLoading = false;
+      btn.disabled = false;
+      document.getElementById('newGameBtn').disabled = false;
+    }
+  }
+
+  function showModal() {
+    // Pre-fill if we have names from a previous game
+    document.getElementById('teamAInput').value = teamA !== 'Team A' ? teamA : '';
+    document.getElementById('teamBInput').value = teamB !== 'Team B' ? teamB : '';
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    setTimeout(() => document.getElementById('teamAInput').focus(), 100);
+  }
+
+  function hideModal() {
+    document.getElementById('modalOverlay').classList.add('hidden');
+  }
+
+  async function startWithTeams() {
+    const a = document.getElementById('teamAInput').value.trim() || 'Team A';
+    const b = document.getElementById('teamBInput').value.trim() || 'Team B';
+    const btn = document.getElementById('modalStartBtn');
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+
+    try {
+      const res = await fetch('/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, team_a: a, team_b: b })
+      });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      saveTeamNames(d.team_a, d.team_b);
+      hideModal();
+      addMessage('host', d.reply);
+    } catch {
+      addMessage('host', '⚠️ Could not start the game. Check the server.');
+      hideModal();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔎 Let\'s Play!';
+    }
+  }
+
+  async function newGame() {
+    if (isLoading) return;
+    await fetch(`/reset/${sessionId}`, { method: 'POST' }).catch(() => {});
+    sessionId = newUUID();
+    localStorage.setItem('gtp_session_id', sessionId);
+    container.innerHTML = '';
+    document.getElementById('scoreBadge').classList.add('hidden');
+    showModal();
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+  }
+
+  /* ── STARTUP: restore history or show team-name modal ── */
+  (async function () {
+    try {
+      const res = await fetch(`/history/${sessionId}`);
+      const data = await res.json();
+      const messages = data.messages || [];
+
+      if (messages.length > 0) {
+        // Restore team names and chat history
+        saveTeamNames(data.team_a || 'Team A', data.team_b || 'Team B');
+        removeSplash();
+        // Skip the internal "Start the game!" user trigger — show from index 1
+        const displayFrom = (messages[0]?.role === 'user' && messages[0]?.content?.startsWith('Start the game!')) ? 1 : 0;
+        for (const msg of messages.slice(displayFrom)) {
+          if (msg.role === 'user') addMessage('user', msg.content);
+          else if (msg.role === 'assistant') addMessage('host', msg.content);
+        }
+        hideModal();
+      } else {
+        // No history — ask for team names
+        showModal();
+      }
+    } catch {
+      showModal();
+    }
+
+    document.getElementById('chatInput').focus();
+  })();
+</script>
+</body>
+</html>
