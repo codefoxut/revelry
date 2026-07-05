@@ -25,6 +25,7 @@ players' phones must go through the server.
 ```jsonc
 {
   "mode": "teams" | "individual",
+  "movie_source": "offline" | "online",  // set at /start, see "Movie source" below
   "teams": [{ "id": "t0", "name": "Red Squad" }, ...],   // "teams" list holds
                                                           // players too in
                                                           // individual mode —
@@ -32,6 +33,9 @@ players' phones must go through the server.
   "scores": { "t0": 0, "t1": 1, ... },
   "turn_index": 0,               // index into `teams` of whoever is up
   "pool": [ {id, title, year, difficulty, mime_hint}, ... ],  // remaining movies
+                                                               // (offline mode only — always [] in online mode)
+  "used_titles": ["Sholay", ...],  // titles already suggested this session —
+                                    // only populated/consumed in online mode
   "current": { ... } | null,     // the currently revealed movie, or null
   "pending_steal": false,        // teams mode only — see below
   "status": "playing" | "finished",
@@ -84,13 +88,31 @@ and the setup-screen bounds differ. See `MODE_LIMITS` in
 `static/index.html` and the `mode ==` branches in `resolve_round()` in
 `main.py` if you need to adjust bounds or add a third mode.
 
+## Movie source: offline vs online
+
+Chosen at game start alongside `mode`, via `movie_source` on the `/start`
+request (`"offline"` default, or `"online"`). This is a parallel toggle to
+teams/individual — see [`MOVIE_DATABASE.md`](MOVIE_DATABASE.md) for full
+detail on both paths. In short: offline samples `pool` from
+`data/movies.db` once at start and `/reveal` pops from it (deterministic, no
+LLM calls); online skips the pool entirely and `/reveal` calls Claude live
+each time via `generate_online_movie()`, tracking `used_titles` in session
+state so it doesn't repeat itself.
+
+Online mode is only ever offered if `ANTHROPIC_API_KEY` is configured —
+`GET /config` reports `online_mode_available`, and the frontend doesn't
+render the online toggle option at all if it's false (not just disables
+it). `/start` also rejects `movie_source: "online"` server-side if the key
+is missing, as a backstop against a forged request.
+
 ## API surface (`main.py`)
 
 | Route | Method | Purpose |
 |---|---|---|
-| `/start` | POST | `{session_id, teams: [names], mode}` → creates a fresh session, samples a movie pool, returns initial state. `teams` holds names for either mode (bad naming carried over from the teams-only original — treat it as "participant names" regardless of mode). |
+| `/start` | POST | `{session_id, teams: [names], mode, movie_source}` → creates a fresh session, returns initial state. `teams` holds names for either mode (bad naming carried over from the teams-only original — treat it as "participant names" regardless of mode). |
+| `/config` | GET | `{online_mode_available}` — whether `ANTHROPIC_API_KEY` is configured; frontend uses this to decide whether to show the online-mode toggle at all. |
 | `/state/{id}` | GET | Fetch current state; 404 if the session doesn't exist yet (frontend uses the 404 to decide whether to show the setup modal on load). |
-| `/reveal/{id}` | POST | Pops the next movie off `pool` into `current`. 400 if one's already revealed or the pool's empty. |
+| `/reveal/{id}` | POST | Offline: pops the next movie off `pool` into `current` (400 if one's already revealed or the pool's empty). Online: calls Claude for one movie instead (502 if the API call fails). |
 | `/resolve/{id}` | POST | `{result, guesser_id?}` — see mode branches above. Always calls `apply_win_check` and re-saves. |
 | `/reset/{id}` | POST | Deletes the session file. Frontend then mints a new `session_id` and shows the modal again. |
 
@@ -130,9 +152,10 @@ make run       # requires a .env with ANTHROPIC_API_KEY (only used by
                # on :8080 with --reload
 ```
 
-`ANTHROPIC_API_KEY` is only read by the offline curation scripts in
-`tools/` (see `MOVIE_DATABASE.md`) — gameplay itself never calls an LLM,
-so the server runs fine without a real key if you're only testing game
-logic. `sessions/` and `.venv/` are gitignored; deleting `sessions/`
+`ANTHROPIC_API_KEY` is read by the offline curation scripts in `tools/`
+(see `MOVIE_DATABASE.md`) and, if present, by online-mode gameplay itself
+(see "Movie source" above). If it's missing, the server still runs fine —
+offline-mode games work unaffected, and online mode simply isn't offered
+as an option. `sessions/` and `.venv/` are gitignored; deleting `sessions/`
 while the server is running will 500 the next write until the directory
 exists again (it's only `mkdir`'d once, at import time, in `main.py`).

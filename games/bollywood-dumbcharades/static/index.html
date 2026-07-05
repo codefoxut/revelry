@@ -665,6 +665,7 @@
       <div class="modal-divider"></div>
 
       <div id="modeToggle" class="mode-toggle"></div>
+      <div id="sourceToggle" class="mode-toggle"></div>
 
       <div id="teamRows"></div>
 
@@ -938,6 +939,8 @@
 
   let currentMode = localStorage.getItem('dc_mode') || 'teams';
   let lastTeamNames = JSON.parse(localStorage.getItem('dc_team_names') || 'null') || ['', ''];
+  let currentSource = localStorage.getItem('dc_movie_source') || 'offline';
+  let onlineModeAvailable = false;
 
   function saveTeamNames(names) {
     lastTeamNames = names;
@@ -960,6 +963,25 @@
     localStorage.setItem('dc_mode', mode);
     renderModeToggle();
     buildTeamRows(Array(MODE_LIMITS[mode].min).fill(''));
+  }
+
+  function renderSourceToggle() {
+    const el = document.getElementById('sourceToggle');
+    if (!onlineModeAvailable) {
+      el.innerHTML = '';
+      currentSource = 'offline';
+      return;
+    }
+    el.innerHTML = `
+      <button type="button" class="mode-btn ${currentSource === 'offline' ? 'active' : ''}" onclick="setSource('offline')">💾 Offline</button>
+      <button type="button" class="mode-btn ${currentSource === 'online' ? 'active' : ''}" onclick="setSource('online')">🌐 Online</button>`;
+  }
+
+  function setSource(source) {
+    if (source === currentSource) return;
+    currentSource = source;
+    localStorage.setItem('dc_movie_source', source);
+    renderSourceToggle();
   }
 
   function buildTeamRows(names) {
@@ -1143,6 +1165,7 @@
 
   function showModal() {
     renderModeToggle();
+    renderSourceToggle();
     const limits = MODE_LIMITS[currentMode];
     const namesForMode = (lastTeamNames.length >= limits.min && lastTeamNames.length <= limits.max)
       ? lastTeamNames
@@ -1170,7 +1193,7 @@
       const state = await fetchJson('/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, teams: names, mode: currentMode })
+        body: JSON.stringify({ session_id: sessionId, teams: names, mode: currentMode, movie_source: currentSource })
       });
       hideModal();
       renderState(state);
@@ -1204,6 +1227,12 @@
 
   /* ── STARTUP: restore in-progress game or show team-name modal ── */
   (async function () {
+    try {
+      const config = await fetchJson('/config');
+      onlineModeAvailable = !!config.online_mode_available;
+    } catch {
+      onlineModeAvailable = false;
+    }
     try {
       const state = await fetchJson(`/state/${sessionId}`);
       renderState(state);

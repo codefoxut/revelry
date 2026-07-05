@@ -98,9 +98,19 @@ of 15 titles per Claude call.
 
 ## How `main.py` uses this database
 
-`main.py` calls `movie_db.ready_movies()` and samples a shuffled pool of
-`dumb_charades_ready` entries once per game session (`sample_movie_pool()`),
-storing it in the session's game state. The game itself is fully
-deterministic — `main.py` pops movies off the pool and drives scoring
-directly with no LLM calls during play. Claude is only used offline, by the
-`tools/` curation scripts, to grow `data/movies.db` with new entries.
+This describes **offline mode** only (the default `movie_source` at
+`/start`). `main.py` calls `movie_db.ready_movies()` and samples a shuffled
+pool of `dumb_charades_ready` entries once per game session
+(`sample_movie_pool()`), storing it in the session's game state. Offline
+mode is fully deterministic — `main.py` pops movies off the pool and drives
+scoring directly with no LLM calls during play. Claude is only used
+offline, by the `tools/` curation scripts, to grow `data/movies.db` with
+new entries.
+
+**Online mode** (`movie_source: "online"`, chosen at game start — see
+[`GAME_ENGINE.md`](GAME_ENGINE.md)) bypasses this database entirely:
+`generate_online_movie()` in `main.py` asks Claude for one movie live on
+each `/reveal`, prompted with the same mimeability criteria as
+`dumb_charades_ready` above, and constrained to the `{title, year,
+difficulty, mime_hint}` shape via structured JSON output. It's only offered
+when `ANTHROPIC_API_KEY` is configured.
