@@ -1,0 +1,2 @@
+DISPLAY_NAME = "Mafia"
+MIN_PLAYERS = 4

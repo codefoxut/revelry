@@ -12,13 +12,9 @@ Modern party games for friends, families, and teams.
 
 ## Tech Stack
 
-- Next.js
-- Vue.js
-- FastAPI
-- tornado
-- PostgreSQL
-- Redis
-- WebSockets
+- Next.js, React, TypeScript, Tailwind CSS (frontend)
+- FastAPI, SQLAlchemy, WebSockets (backend)
+- SQLite (persistent data) + in-memory stores (active game state)
 
 ## Roadmap
 
