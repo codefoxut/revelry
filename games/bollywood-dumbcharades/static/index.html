@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎬 Bollywood Dumb Charades</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --saffron: #FF9933;
+      --deep-saffron: #D45A00;
+      --gold: #F5C842;
+      --pale-gold: #F8E89A;
+      --crimson: #C1203A;
+      --deep-maroon: #1C0008;
+      --maroon: #4A0018;
+      --ivory: #FFF4DC;
+      --dark: #110006;
+      --panel: rgba(40, 4, 14, 0.85);
+      --timer-ok: #4CAF50;
+      --timer-warn: #FF9933;
+      --timer-danger: #C1203A;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+      background-color: var(--dark);
+      color: var(--ivory);
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      background-image:
+        radial-gradient(ellipse 60% 40% at 15% 60%, rgba(160, 20, 50, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 35% at 85% 25%, rgba(200, 100, 0, 0.12) 0%, transparent 55%),
+        radial-gradient(ellipse 80% 50% at 50% 100%, rgba(80, 0, 20, 0.3) 0%, transparent 60%);
+    }
+
+    /* ─── HEADER ──────────────────────────────────────── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: linear-gradient(180deg, #1c0008 0%, #2e0010 100%);
+      border-bottom: 1px solid rgba(245, 200, 66, 0.35);
+      box-shadow: 0 2px 24px rgba(193, 32, 58, 0.35);
+    }
+
+    .film-strip {
+      display: flex;
+      height: 14px;
+      background: #0d0004;
+      overflow: hidden;
+    }
+    .film-strip-hole {
+      flex-shrink: 0;
+      width: 10px;
+      height: 7px;
+      background: rgba(245, 200, 66, 0.15);
+      border-radius: 1px;
+      margin: 3.5px 4px;
+      border: 1px solid rgba(245, 200, 66, 0.3);
+    }
+
+    .header-body {
+      padding: 10px 16px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+      max-width: 740px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .title-block { display: flex; flex-direction: column; gap: 1px; }
+
+    .game-title {
+      font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 1.5px;
+      text-shadow: 0 0 14px rgba(245, 200, 66, 0.6);
+      line-height: 1;
+    }
+
+    .game-subtitle {
+      font-size: 0.6rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--saffron);
+      font-style: italic;
+      opacity: 0.8;
+    }
+
+    .score-badge {
+      font-family: "Courier New", monospace;
+      font-size: clamp(0.7rem, 1.8vw, 0.82rem);
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(245, 200, 66, 0.35);
+      color: var(--pale-gold);
+      padding: 5px 12px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      transition: opacity 0.3s;
+    }
+    .score-badge.hidden { opacity: 0; pointer-events: none; }
+
+    .new-game-btn {
+      background: var(--crimson);
+      color: var(--pale-gold);
+      border: 1px solid rgba(245, 200, 66, 0.45);
+      padding: 6px 13px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .new-game-btn:hover { background: #a31730; box-shadow: 0 0 14px rgba(255, 153, 51, 0.45); }
+    .new-game-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ─── RANGOLI DIVIDER ─────────────────────────────── */
+    .rangoli-divider {
+      height: 5px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--gold) 0px, var(--gold) 8px,
+        var(--saffron) 8px, var(--saffron) 16px,
+        var(--crimson) 16px, var(--crimson) 24px,
+        var(--saffron) 24px, var(--saffron) 32px
+      );
+      opacity: 0.85;
+    }
+
+    /* ─── TIMER BAR ───────────────────────────────────── */
+    .timer-bar {
+      background: linear-gradient(180deg, #1a0008 0%, #140006 100%);
+      border-bottom: 1px solid rgba(245, 200, 66, 0.2);
+      padding: 10px 16px;
+    }
+
+    .timer-inner {
+      max-width: 740px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Circular countdown */
+    .timer-circle-wrap {
+      position: relative;
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+    }
+
+    .timer-svg {
+      width: 56px;
+      height: 56px;
+      transform: rotate(-90deg);
+    }
+
+    .timer-track {
+      fill: none;
+      stroke: rgba(255,255,255,0.08);
+      stroke-width: 4;
+    }
+
+    .timer-progress {
+      fill: none;
+      stroke: var(--timer-ok);
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-dasharray: 138.2; /* 2π × 22 */
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
+    }
+
+    .timer-label {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Courier New", monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--pale-gold);
+      letter-spacing: -0.5px;
+      transition: color 0.5s;
+    }
+
+    /* Time-up flash */
+    .timer-circle-wrap.timesup .timer-label {
+      animation: flashLabel 0.5s ease-in-out infinite alternate;
+    }
+    @keyframes flashLabel {
+      from { color: var(--crimson); }
+      to   { color: var(--gold); }
+    }
+
+    /* Controls */
+    .timer-controls { display: flex; align-items: center; gap: 8px; }
+
+    .t-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(245, 200, 66, 0.3);
+      color: var(--pale-gold);
+      width: 34px;
+      height: 34px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.18s, box-shadow 0.18s;
+      flex-shrink: 0;
+    }
+    .t-btn:hover { background: rgba(245, 200, 66, 0.15); box-shadow: 0 0 10px rgba(245, 200, 66, 0.2); }
+    .t-btn.active { background: rgba(193, 32, 58, 0.4); border-color: var(--crimson); }
+
+    /* Duration setter */
+    .timer-set {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(245, 200, 66, 0.25);
+      border-radius: 5px;
+      padding: 4px 8px;
+    }
+
+    .timer-set label {
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(245, 200, 66, 0.6);
+      white-space: nowrap;
+    }
+
+    .duration-input {
+      width: 44px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--pale-gold);
+      font-family: "Courier New", monospace;
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-align: center;
+      caret-color: var(--gold);
+    }
+    /* hide spinners */
+    .duration-input::-webkit-outer-spin-button,
+    .duration-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .duration-input { -moz-appearance: textfield; }
+
+    .set-apply-btn {
+      background: rgba(193, 32, 58, 0.5);
+      border: 1px solid rgba(245, 200, 66, 0.3);
+      color: var(--pale-gold);
+      padding: 2px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: background 0.18s;
+    }
+    .set-apply-btn:hover { background: rgba(193, 32, 58, 0.8); }
+
+    /* Status text */
+    .timer-status {
+      font-size: 0.78rem;
+      color: rgba(255, 244, 220, 0.5);
+      font-style: italic;
+      flex: 1;
+      min-width: 80px;
+    }
+    .timer-status.urgent { color: var(--crimson); font-style: normal; font-weight: 700; animation: pulse 0.6s ease-in-out infinite alternate; }
+    .timer-status.timesup { color: var(--gold); font-style: normal; font-weight: 700; }
+    @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
+
+    /* Progress bar beneath timer (full-width) */
+    .timer-progress-bar {
+      height: 3px;
+      background: rgba(255,255,255,0.06);
+      margin-top: 8px;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .timer-progress-fill {
+      height: 100%;
+      background: var(--timer-ok);
+      border-radius: 2px;
+      width: 100%;
+      transition: width 1s linear, background 0.5s ease;
+    }
+
+    /* ─── GAME STAGE ──────────────────────────────────── */
+    .game-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+    .game-scroll {
+      flex: 1;
+      overflow-y: auto;
+      max-width: 740px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+      padding: 28px 20px 40px;
+    }
+
+    .turn-banner {
+      font-size: clamp(1rem, 3vw, 1.2rem);
+      color: var(--gold);
+      letter-spacing: 1px;
+      text-align: center;
+      text-shadow: 0 0 14px rgba(245, 200, 66, 0.5);
+    }
+    .turn-banner.hidden { display: none; }
+
+    .movie-card {
+      width: 100%;
+      max-width: 420px;
+      min-height: 220px;
+      border-radius: 16px;
+      border: 2px solid rgba(245, 200, 66, 0.4);
+      background: linear-gradient(135deg, #2d0610 0%, #1a040d 100%);
+      box-shadow: 0 8px 40px rgba(193, 32, 58, 0.35), inset 0 0 60px rgba(245, 200, 66, 0.03);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 32px 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      animation: cardIn 0.3s cubic-bezier(.17,.67,.46,1) both;
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.97); }
+      to   { opacity: 1; transform: none; }
+    }
+    .movie-card::before, .movie-card::after {
+      content: '✦';
+      position: absolute;
+      color: rgba(245, 200, 66, 0.2);
+      font-size: 1.2rem;
+    }
+    .movie-card::before { top: 10px; left: 14px; }
+    .movie-card::after  { bottom: 10px; right: 14px; }
+
+    .card-icon { font-size: 3.4rem; opacity: 0.85; filter: drop-shadow(0 0 20px rgba(245, 200, 66, 0.4)); }
+
+    .reveal-btn {
+      padding: 13px 28px;
+      background: linear-gradient(135deg, var(--crimson) 0%, #8B0020 100%);
+      color: var(--pale-gold);
+      border: 1.5px solid rgba(245, 200, 66, 0.45);
+      border-radius: 7px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    .reveal-btn:hover { background: linear-gradient(135deg, #D02040 0%, var(--crimson) 100%); box-shadow: 0 0 20px rgba(255, 153, 51, 0.4); transform: translateY(-1px); }
+
+    .card-difficulty {
+      font-size: 0.65rem;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 700;
+    }
+    .card-difficulty.diff-easy   { background: rgba(76, 175, 80, 0.2); color: #7ee08a; border: 1px solid rgba(76,175,80,0.5); }
+    .card-difficulty.diff-medium { background: rgba(255, 153, 51, 0.2); color: var(--saffron); border: 1px solid rgba(255,153,51,0.5); }
+    .card-difficulty.diff-hard   { background: rgba(193, 32, 58, 0.25); color: #ff8fa3; border: 1px solid rgba(193,32,58,0.5); }
+
+    .card-title {
+      font-size: clamp(1.4rem, 5vw, 2rem);
+      font-weight: 700;
+      color: var(--gold);
+      text-shadow: 0 0 16px rgba(245, 200, 66, 0.5);
+      line-height: 1.25;
+    }
+    .card-year { font-size: 0.85rem; color: var(--saffron); opacity: 0.8; }
+    .card-hint {
+      font-size: 0.85rem;
+      color: var(--pale-gold);
+      font-style: italic;
+      opacity: 0.8;
+      margin-top: 4px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(245, 200, 66, 0.25);
+      width: 100%;
+    }
+
+    .steal-icon, .trophy { font-size: 3rem; }
+    .steal-text, .winner-text {
+      font-size: clamp(1.1rem, 4vw, 1.5rem);
+      font-weight: 700;
+      color: var(--gold);
+      text-shadow: 0 0 16px rgba(245, 200, 66, 0.5);
+    }
+    .steal-text strong { color: var(--saffron); }
+
+    .empty-note { color: rgba(255, 244, 220, 0.4); font-style: italic; font-size: 0.9rem; }
+
+    .actions {
+      display: flex;
+      gap: 14px;
+      width: 100%;
+      max-width: 420px;
+      transition: opacity 0.15s;
+    }
+    .actions.busy { opacity: 0.5; pointer-events: none; }
+
+    .result-btn {
+      flex: 1;
+      padding: 16px 10px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border: 1.5px solid rgba(245, 200, 66, 0.4);
+      transition: all 0.2s;
+    }
+    .correct-btn { background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #eaffea; }
+    .correct-btn:hover { box-shadow: 0 0 18px rgba(76, 175, 80, 0.5); transform: translateY(-1px); }
+    .pass-btn { background: linear-gradient(135deg, var(--crimson) 0%, #8B0020 100%); color: var(--pale-gold); }
+    .pass-btn:hover { box-shadow: 0 0 18px rgba(255, 153, 51, 0.5); transform: translateY(-1px); }
+    .play-again-btn { background: linear-gradient(135deg, var(--gold) 0%, var(--deep-saffron) 100%); color: #1c0008; }
+    .play-again-btn:hover { box-shadow: 0 0 20px rgba(245, 200, 66, 0.5); transform: translateY(-1px); }
+
+    .actions.picker-actions { flex-wrap: wrap; justify-content: center; max-width: 480px; }
+    .guesser-btn {
+      flex: 0 1 130px;
+      background: rgba(0,0,0,0.35);
+      color: var(--pale-gold);
+    }
+    .guesser-btn:hover { box-shadow: 0 0 18px rgba(245, 200, 66, 0.35); transform: translateY(-1px); }
+
+    /* ─── TEAM NAME MODAL ────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 0, 5, 0.88);
+      backdrop-filter: blur(6px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.25s ease;
+    }
+    .modal-overlay.hidden { display: none; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal {
+      background: linear-gradient(160deg, #2a0010 0%, #1a0008 60%, #280008 100%);
+      border: 1px solid rgba(245, 200, 66, 0.45);
+      border-radius: 12px;
+      padding: 32px 28px 28px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 0 60px rgba(193, 32, 58, 0.4), 0 0 0 1px rgba(245,200,66,0.1);
+      animation: slideUp 0.3s cubic-bezier(.17,.67,.46,1);
+      position: relative;
+      overflow: hidden;
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+    /* decorative corner dots */
+    .modal::before, .modal::after {
+      content: '✦';
+      position: absolute;
+      color: rgba(245, 200, 66, 0.25);
+      font-size: 1.4rem;
+    }
+    .modal::before { top: 12px; left: 16px; }
+    .modal::after  { bottom: 12px; right: 16px; }
+
+    .modal-title {
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .modal-title h2 {
+      font-size: 1.3rem;
+      color: var(--gold);
+      letter-spacing: 1px;
+      text-shadow: 0 0 16px rgba(245,200,66,0.5);
+    }
+    .modal-title p {
+      font-size: 0.72rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--saffron);
+      opacity: 0.75;
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    .modal-divider {
+      height: 2px;
+      background: repeating-linear-gradient(90deg,
+        var(--gold) 0, var(--gold) 6px,
+        var(--saffron) 6px, var(--saffron) 12px,
+        var(--crimson) 12px, var(--crimson) 18px,
+        var(--saffron) 18px, var(--saffron) 24px
+      );
+      margin: 16px 0 24px;
+      border-radius: 1px;
+      opacity: 0.7;
+    }
+
+    .mode-toggle { display: flex; gap: 10px; margin-bottom: 20px; }
+    .mode-btn {
+      flex: 1;
+      padding: 10px 8px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.8rem;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      background: rgba(0,0,0,0.35);
+      border: 1.5px solid rgba(245, 200, 66, 0.3);
+      color: rgba(255,244,220,0.6);
+      transition: all 0.2s;
+    }
+    .mode-btn.active {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--deep-saffron) 100%);
+      color: #1c0008;
+      border-color: var(--gold);
+    }
+
+    .team-field { margin-bottom: 18px; }
+    .team-field label {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(245, 200, 66, 0.65);
+      margin-bottom: 7px;
+    }
+    .team-field label span { margin-right: 6px; }
+
+    .team-input {
+      width: 100%;
+      background: rgba(0,0,0,0.35);
+      border: 1.5px solid rgba(245, 200, 66, 0.3);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: var(--ivory);
+      font-family: inherit;
+      font-size: 1rem;
+      outline: none;
+      caret-color: var(--gold);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .team-input:focus {
+      border-color: rgba(245, 200, 66, 0.7);
+      box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.08);
+    }
+    .team-input::placeholder { color: rgba(255,244,220,0.25); font-style: italic; }
+
+    .team-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px; }
+    .team-row .team-field { flex: 1; margin-bottom: 0; }
+    .remove-team-btn {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      background: rgba(193, 32, 58, 0.25);
+      border: 1.5px solid rgba(245, 200, 66, 0.3);
+      color: var(--pale-gold);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.18s;
+    }
+    .remove-team-btn:hover { background: rgba(193, 32, 58, 0.5); }
+    .remove-team-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+    .add-team-btn {
+      width: 100%;
+      padding: 9px;
+      margin-bottom: 18px;
+      background: rgba(245, 200, 66, 0.08);
+      border: 1.5px dashed rgba(245, 200, 66, 0.35);
+      color: var(--pale-gold);
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      transition: background 0.18s;
+    }
+    .add-team-btn:hover { background: rgba(245, 200, 66, 0.16); }
+    .add-team-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .modal-start-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--crimson) 0%, #8B0020 100%);
+      color: var(--pale-gold);
+      border: 1.5px solid rgba(245, 200, 66, 0.45);
+      border-radius: 7px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    .modal-start-btn:hover {
+      background: linear-gradient(135deg, #D02040 0%, var(--crimson) 100%);
+      box-shadow: 0 0 20px rgba(255, 153, 51, 0.4);
+      transform: translateY(-1px);
+    }
+    .modal-start-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ─── RESPONSIVE ──────────────────────────────────── */
+    @media (max-width: 500px) {
+      .game-subtitle { display: none; }
+      .score-badge { font-size: 0.68rem; padding: 4px 8px; }
+      .timer-status { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TEAM NAME MODAL -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-title">
+        <h2>🎬 Dumb Charades</h2>
+        <p>★ enter your team names ★</p>
+      </div>
+      <div class="modal-divider"></div>
+
+      <div id="modeToggle" class="mode-toggle"></div>
+
+      <div id="teamRows"></div>
+
+      <button type="button" class="add-team-btn" id="addTeamBtn" onclick="addTeamRow()">➕ Add Team</button>
+
+      <button class="modal-start-btn" id="modalStartBtn" onclick="startWithTeams()">
+        🎉 Let's Play!
+      </button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="film-strip" id="filmStrip"></div>
+    <div class="header-body">
+      <div class="title-block">
+        <div class="game-title">🎬 Bollywood Dumb Charades</div>
+        <div class="game-subtitle">★ the ultimate party game ★</div>
+      </div>
+      <div class="score-badge hidden" id="scoreBadge">A: 0 | B: 0</div>
+      <button class="new-game-btn" id="newGameBtn" onclick="newGame()">🎲 New Game</button>
+    </div>
+  </header>
+
+  <div class="rangoli-divider"></div>
+
+  <!-- TIMER BAR -->
+  <div class="timer-bar">
+    <div class="timer-inner">
+
+      <!-- Circular timer -->
+      <div class="timer-circle-wrap" id="timerCircle">
+        <svg class="timer-svg" viewBox="0 0 56 56">
+          <circle class="timer-track" cx="28" cy="28" r="22"/>
+          <circle class="timer-progress" id="timerArc" cx="28" cy="28" r="22"/>
+        </svg>
+        <div class="timer-label" id="timerLabel">1:30</div>
+      </div>
+
+      <!-- Control buttons -->
+      <div class="timer-controls">
+        <button class="t-btn" id="startPauseBtn" onclick="toggleTimer()" title="Start / Pause">▶</button>
+        <button class="t-btn" onclick="resetTimer()" title="Reset">↺</button>
+      </div>
+
+      <!-- Duration setter -->
+      <div class="timer-set">
+        <label for="durationInput">Set</label>
+        <input
+          class="duration-input"
+          id="durationInput"
+          type="number"
+          min="10"
+          max="300"
+          value="90"
+          onkeydown="if(event.key==='Enter') applyDuration()"
+        />
+        <span style="color:rgba(245,200,66,0.5);font-size:0.75rem;">s</span>
+        <button class="set-apply-btn" onclick="applyDuration()">Set</button>
+      </div>
+
+      <!-- Status text -->
+      <div class="timer-status" id="timerStatus">Ready — press ▶ to start</div>
+
+    </div>
+
+    <!-- Full-width progress bar -->
+    <div class="timer-progress-bar" style="max-width:740px;margin:8px auto 0;">
+      <div class="timer-progress-fill" id="timerFill"></div>
+    </div>
+  </div>
+
+  <!-- GAME STAGE -->
+  <div class="game-wrap">
+    <div class="game-scroll" id="gameScroll">
+      <div class="turn-banner hidden" id="turnBanner"></div>
+      <div id="stage">
+        <div class="movie-card">
+          <div class="card-icon">🎬</div>
+          <div class="empty-note">Lights… Camera… Action!</div>
+        </div>
+      </div>
+      <div class="actions" id="actions"></div>
+    </div>
+  </div>
+
+<script>
+  /* ── FILM STRIP ── */
+  (function () {
+    const strip = document.getElementById('filmStrip');
+    for (let i = 0; i < 80; i++) {
+      const h = document.createElement('div');
+      h.className = 'film-strip-hole';
+      strip.appendChild(h);
+    }
+  })();
+
+  /* ── SESSION (persisted in localStorage) ── */
+  function newUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  let sessionId = localStorage.getItem('dc_session_id');
+  if (!sessionId) {
+    sessionId = newUUID();
+    localStorage.setItem('dc_session_id', sessionId);
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /* ══════════════════════════════════════════════════
+     TIMER
+  ══════════════════════════════════════════════════ */
+  const CIRCUMFERENCE = 2 * Math.PI * 22; // 138.2
+
+  let totalSeconds   = 90;
+  let remaining      = 90;
+  let timerRunning   = false;
+  let timerInterval  = null;
+
+  const arcEl        = document.getElementById('timerArc');
+  const labelEl      = document.getElementById('timerLabel');
+  const fillEl       = document.getElementById('timerFill');
+  const statusEl     = document.getElementById('timerStatus');
+  const startPauseEl = document.getElementById('startPauseBtn');
+  const circleWrap   = document.getElementById('timerCircle');
+
+  function fmtTime(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  }
+
+  function getColor(pct) {
+    if (pct > 0.5) return 'var(--timer-ok)';
+    if (pct > 0.25) return 'var(--timer-warn)';
+    return 'var(--timer-danger)';
+  }
+
+  function renderTimer() {
+    const pct = totalSeconds > 0 ? remaining / totalSeconds : 0;
+    const offset = CIRCUMFERENCE * (1 - pct);
+    const color = getColor(pct);
+
+    arcEl.style.strokeDashoffset = offset;
+    arcEl.style.stroke = color;
+    fillEl.style.width = (pct * 100) + '%';
+    fillEl.style.background = color;
+    labelEl.textContent = fmtTime(remaining);
+
+    // Status text
+    if (remaining <= 0) {
+      statusEl.textContent = '⏰ TIME\'S UP!';
+      statusEl.className = 'timer-status timesup';
+      circleWrap.classList.add('timesup');
+    } else if (remaining <= 10) {
+      statusEl.textContent = `⚡ ${remaining}s left!`;
+      statusEl.className = 'timer-status urgent';
+      circleWrap.classList.remove('timesup');
+    } else if (timerRunning) {
+      statusEl.textContent = `🎭 Miming in progress…`;
+      statusEl.className = 'timer-status';
+      circleWrap.classList.remove('timesup');
+    } else if (remaining === totalSeconds) {
+      statusEl.textContent = 'Ready — press ▶ to start';
+      statusEl.className = 'timer-status';
+      circleWrap.classList.remove('timesup');
+    } else {
+      statusEl.textContent = 'Paused';
+      statusEl.className = 'timer-status';
+      circleWrap.classList.remove('timesup');
+    }
+  }
+
+  function stopInterval() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+
+  function toggleTimer() {
+    if (remaining <= 0) { resetTimer(); return; }
+
+    if (timerRunning) {
+      // Pause
+      stopInterval();
+      timerRunning = false;
+      startPauseEl.textContent = '▶';
+      startPauseEl.classList.remove('active');
+      renderTimer();
+    } else {
+      // Start
+      timerRunning = true;
+      startPauseEl.textContent = '⏸';
+      startPauseEl.classList.add('active');
+      timerInterval = setInterval(tick, 1000);
+      renderTimer();
+    }
+  }
+
+  function startTimer() {
+    if (!timerRunning && remaining > 0) toggleTimer();
+  }
+
+  function tick() {
+    if (remaining > 0) {
+      remaining--;
+      renderTimer();
+    }
+    if (remaining <= 0) {
+      stopInterval();
+      timerRunning = false;
+      startPauseEl.textContent = '▶';
+      startPauseEl.classList.remove('active');
+      onTimesUp();
+    }
+  }
+
+  function onTimesUp() {
+    document.body.style.transition = 'background-color 0.15s';
+    document.body.style.backgroundColor = '#3d0010';
+    setTimeout(() => { document.body.style.backgroundColor = ''; }, 300);
+  }
+
+  function resetTimer() {
+    stopInterval();
+    timerRunning = false;
+    remaining = totalSeconds;
+    startPauseEl.textContent = '▶';
+    startPauseEl.classList.remove('active');
+    circleWrap.classList.remove('timesup');
+    renderTimer();
+  }
+
+  function applyDuration() {
+    const inp = document.getElementById('durationInput');
+    const val = Math.max(10, Math.min(300, parseInt(inp.value) || 90));
+    inp.value = val;
+    totalSeconds = val;
+    remaining = val;
+    stopInterval();
+    timerRunning = false;
+    startPauseEl.textContent = '▶';
+    startPauseEl.classList.remove('active');
+    renderTimer();
+  }
+
+  // Init arc
+  arcEl.style.strokeDasharray = CIRCUMFERENCE;
+  arcEl.style.strokeDashoffset = 0;
+  renderTimer();
+
+  /* ══════════════════════════════════════════════════
+     GAME STAGE
+  ══════════════════════════════════════════════════ */
+  const MIN_TEAMS = 2;
+  const MAX_TEAMS = 8;
+  const MIN_PLAYERS = 3;
+  const MAX_PLAYERS = 5;
+  const TEAM_EMOJIS = ['🔴', '🔵', '🟢', '🟡', '🟣', '🟠', '⚪', '⚫'];
+  const MODE_LIMITS = {
+    teams: { min: MIN_TEAMS, max: MAX_TEAMS, label: 'Team', placeholder: 'e.g. Filmy Folks' },
+    individual: { min: MIN_PLAYERS, max: MAX_PLAYERS, label: 'Player', placeholder: 'e.g. Raj' }
+  };
+
+  let currentMode = localStorage.getItem('dc_mode') || 'teams';
+  let lastTeamNames = JSON.parse(localStorage.getItem('dc_team_names') || 'null') || ['', ''];
+
+  function saveTeamNames(names) {
+    lastTeamNames = names;
+    localStorage.setItem('dc_team_names', JSON.stringify(names));
+  }
+
+  function readTeamRows() {
+    return Array.from(document.querySelectorAll('#teamRows .team-input')).map(inp => inp.value);
+  }
+
+  function renderModeToggle() {
+    document.getElementById('modeToggle').innerHTML = `
+      <button type="button" class="mode-btn ${currentMode === 'teams' ? 'active' : ''}" onclick="setMode('teams')">👥 Teams</button>
+      <button type="button" class="mode-btn ${currentMode === 'individual' ? 'active' : ''}" onclick="setMode('individual')">🧑 Individual Players</button>`;
+  }
+
+  function setMode(mode) {
+    if (mode === currentMode) return;
+    currentMode = mode;
+    localStorage.setItem('dc_mode', mode);
+    renderModeToggle();
+    buildTeamRows(Array(MODE_LIMITS[mode].min).fill(''));
+  }
+
+  function buildTeamRows(names) {
+    const limits = MODE_LIMITS[currentMode];
+    const rows = document.getElementById('teamRows');
+    rows.innerHTML = names.map((name, i) => `
+      <div class="team-row">
+        <div class="team-field">
+          <label><span>${TEAM_EMOJIS[i % TEAM_EMOJIS.length]}</span> ${limits.label} ${i + 1}</label>
+          <input
+            class="team-input"
+            type="text"
+            maxlength="24"
+            placeholder="${limits.placeholder}"
+            value="${escapeHtml(name)}"
+            onkeydown="if(event.key==='Enter') startWithTeams()"
+          />
+        </div>
+        <button type="button" class="remove-team-btn" onclick="removeTeamRow(${i})" ${names.length <= limits.min ? 'disabled' : ''} title="Remove ${limits.label.toLowerCase()}">✕</button>
+      </div>`).join('');
+    document.getElementById('addTeamBtn').disabled = names.length >= limits.max;
+    document.getElementById('addTeamBtn').textContent = `➕ Add ${limits.label}`;
+  }
+
+  function addTeamRow() {
+    const limits = MODE_LIMITS[currentMode];
+    const names = readTeamRows();
+    if (names.length >= limits.max) return;
+    names.push('');
+    buildTeamRows(names);
+  }
+
+  function removeTeamRow(i) {
+    const limits = MODE_LIMITS[currentMode];
+    const names = readTeamRows();
+    if (names.length <= limits.min) return;
+    names.splice(i, 1);
+    buildTeamRows(names);
+  }
+
+  const stageEl   = document.getElementById('stage');
+  const actionsEl = document.getElementById('actions');
+  const bannerEl  = document.getElementById('turnBanner');
+
+  let currentState = null;
+
+  function renderState(state) {
+    currentState = state;
+    actionsEl.classList.remove('picker-actions');
+    saveTeamNames(state.teams.map(t => t.name));
+
+    const scoreEl = document.getElementById('scoreBadge');
+    scoreEl.textContent = state.teams.map(t => `${t.name}: ${state.scores[t.id]}`).join(' | ');
+    scoreEl.classList.remove('hidden');
+
+    if (state.status === 'finished') {
+      const winnerTeam = state.teams.find(t => t.id === state.winner);
+      bannerEl.classList.add('hidden');
+      stageEl.innerHTML = `
+        <div class="movie-card">
+          <div class="trophy">🏆</div>
+          <div class="winner-text">${escapeHtml(winnerTeam ? winnerTeam.name : '')} wins!</div>
+        </div>`;
+      actionsEl.innerHTML = `<button class="result-btn play-again-btn" onclick="newGame()">🎉 Play Again</button>`;
+      stopInterval();
+      timerRunning = false;
+      return;
+    }
+
+    bannerEl.classList.remove('hidden');
+    const n = state.teams.length;
+    const currentTeam = state.teams[state.turn_index];
+    const nextTeam = state.teams[(state.turn_index + 1) % n];
+
+    if (state.pending_steal) {
+      bannerEl.textContent = '🔁 Steal chance!';
+      stageEl.innerHTML = `
+        <div class="movie-card">
+          <div class="steal-icon">🔁</div>
+          <div class="steal-text">Did <strong>${escapeHtml(nextTeam.name)}</strong> steal it?</div>
+        </div>`;
+      actionsEl.innerHTML = `
+        <button class="result-btn correct-btn" onclick="resolve('steal_correct')">✅ They got it!</button>
+        <button class="result-btn pass-btn" onclick="resolve('steal_missed')">❌ Nobody got it</button>`;
+      return;
+    }
+
+    bannerEl.textContent = `🎭 ${currentTeam.name}'s turn to mime!`;
+
+    if (state.current) {
+      const m = state.current;
+      stageEl.innerHTML = `
+        <div class="movie-card">
+          <div class="card-difficulty diff-${escapeHtml(m.difficulty)}">${escapeHtml(m.difficulty)}</div>
+          <div class="card-title">${escapeHtml(m.title)}</div>
+          <div class="card-year">(${m.year})</div>
+          ${m.mime_hint ? `<div class="card-hint">💡 ${escapeHtml(m.mime_hint)}</div>` : ''}
+        </div>`;
+      if (state.mode === 'individual') {
+        actionsEl.innerHTML = `
+          <button class="result-btn correct-btn" onclick="onCorrectClick()">✅ Correct</button>
+          <button class="result-btn pass-btn" onclick="resolve('pass')">🙅 Nobody Guessed</button>`;
+      } else {
+        actionsEl.innerHTML = `
+          <button class="result-btn correct-btn" onclick="resolve('correct')">✅ Correct</button>
+          <button class="result-btn pass-btn" onclick="resolve('pass')">🙅 Pass</button>`;
+      }
+    } else {
+      stageEl.innerHTML = `
+        <div class="movie-card">
+          <div class="card-icon">🎬</div>
+          <button class="reveal-btn" onclick="revealMovie()">Reveal Movie</button>
+        </div>`;
+      actionsEl.innerHTML = '';
+    }
+  }
+
+  async function withBusy(fn) {
+    actionsEl.classList.add('busy');
+    try {
+      await fn();
+    } catch (e) {
+      alert(e.message || 'Something went wrong. Check the server.');
+    } finally {
+      actionsEl.classList.remove('busy');
+    }
+  }
+
+  async function fetchJson(url, opts) {
+    const res = await fetch(url, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Request failed');
+    return data;
+  }
+
+  function revealMovie() {
+    return withBusy(async () => {
+      const state = await fetchJson(`/reveal/${sessionId}`, { method: 'POST' });
+      renderState(state);
+      resetTimer();
+      startTimer();
+    });
+  }
+
+  function resolve(result, guesserId) {
+    return withBusy(async () => {
+      const body = { result };
+      if (guesserId) body.guesser_id = guesserId;
+      const state = await fetchJson(`/resolve/${sessionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      renderState(state);
+      resetTimer();
+    });
+  }
+
+  function onCorrectClick() {
+    if (currentState && currentState.mode === 'individual') {
+      renderGuesserPicker(currentState);
+    } else {
+      resolve('correct');
+    }
+  }
+
+  function renderGuesserPicker(state) {
+    const mimer = state.teams[state.turn_index];
+    const others = state.teams.filter(t => t.id !== mimer.id);
+    bannerEl.textContent = '🙋 Who guessed it?';
+    stageEl.innerHTML = `
+      <div class="movie-card">
+        <div class="steal-icon">🙋</div>
+        <div class="steal-text">${escapeHtml(mimer.name)} was miming — pick who shouted it out.</div>
+      </div>`;
+    actionsEl.classList.add('picker-actions');
+    actionsEl.innerHTML = others.map(t =>
+      `<button class="result-btn guesser-btn" onclick="resolve('correct', '${t.id}')">${escapeHtml(t.name)}</button>`
+    ).join('');
+  }
+
+  function showModal() {
+    renderModeToggle();
+    const limits = MODE_LIMITS[currentMode];
+    const namesForMode = (lastTeamNames.length >= limits.min && lastTeamNames.length <= limits.max)
+      ? lastTeamNames
+      : Array(limits.min).fill('');
+    buildTeamRows(namesForMode);
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    setTimeout(() => {
+      const first = document.querySelector('#teamRows .team-input');
+      if (first) first.focus();
+    }, 100);
+  }
+
+  function hideModal() {
+    document.getElementById('modalOverlay').classList.add('hidden');
+  }
+
+  async function startWithTeams() {
+    const limits = MODE_LIMITS[currentMode];
+    const names = readTeamRows().map((n, i) => n.trim() || `${limits.label} ${i + 1}`);
+    const btn = document.getElementById('modalStartBtn');
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+
+    try {
+      const state = await fetchJson('/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, teams: names, mode: currentMode })
+      });
+      hideModal();
+      renderState(state);
+      resetTimer();
+    } catch (e) {
+      alert(e.message || 'Could not start the game. Check the server.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🎉 Let\'s Play!';
+    }
+  }
+
+  async function newGame() {
+    await fetch(`/reset/${sessionId}`, { method: 'POST' }).catch(() => {});
+    sessionId = newUUID();
+    localStorage.setItem('dc_session_id', sessionId);
+    currentState = null;
+    bannerEl.classList.add('hidden');
+    bannerEl.textContent = '';
+    stageEl.innerHTML = `
+      <div class="movie-card">
+        <div class="card-icon">🎬</div>
+        <div class="empty-note">Lights… Camera… Action!</div>
+      </div>`;
+    actionsEl.classList.remove('picker-actions');
+    actionsEl.innerHTML = '';
+    document.getElementById('scoreBadge').classList.add('hidden');
+    resetTimer();
+    showModal();
+  }
+
+  /* ── STARTUP: restore in-progress game or show team-name modal ── */
+  (async function () {
+    try {
+      const state = await fetchJson(`/state/${sessionId}`);
+      renderState(state);
+      hideModal();
+    } catch {
+      showModal();
+    }
+  })();
+</script>
+</body>
+</html>
