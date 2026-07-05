@@ -67,7 +67,25 @@ describe("roomStore", () => {
     expect(state.nightResult).toBeNull();
     expect(state.eliminationResult).toBeNull();
     expect(state.investigationResult).toBeNull();
+    expect(state.mafiaPicks).toEqual([]);
     expect(state.room?.game_state?.phase).toBe("night");
+  });
+
+  it("stores the live mafia_night_picks snapshot and resets it on a new night", () => {
+    captured!.onEvent({
+      type: "mafia_night_picks",
+      picks: [{ player_id: "p1", target_player_id: "p2", locked: false }],
+    });
+    expect(useRoomStore.getState().mafiaPicks).toEqual([
+      { player_id: "p1", target_player_id: "p2", locked: false },
+    ]);
+
+    captured!.onEvent({
+      type: "room_state",
+      room: baseRoom({ phase: "in_game", game_state: { phase: "night", round_number: 2, alive_player_ids: ["p1", "p2"] } }),
+    });
+
+    expect(useRoomStore.getState().mafiaPicks).toEqual([]);
   });
 
   it("updates only the targeted player's connected flag", () => {
@@ -93,5 +111,58 @@ describe("roomStore", () => {
     captured!.onEvent({ type: "kicked" });
 
     expect(useRoomStore.getState().kicked).toBe(true);
+  });
+
+  it("sets nightTimer on night_timer_started", () => {
+    const before = Date.now();
+    captured!.onEvent({ type: "night_timer_started", duration_seconds: 60 });
+
+    const nightTimer = useRoomStore.getState().nightTimer;
+    expect(nightTimer).not.toBeNull();
+    expect(nightTimer!.durationSeconds).toBe(60);
+    expect(nightTimer!.deadlineAt).toBeGreaterThanOrEqual(before + 60_000);
+  });
+
+  it("clears nightTimer when room_state reports a non-night phase", () => {
+    captured!.onEvent({ type: "night_timer_started", duration_seconds: 60 });
+    expect(useRoomStore.getState().nightTimer).not.toBeNull();
+
+    captured!.onEvent({
+      type: "room_state",
+      room: baseRoom({ phase: "in_game", game_state: { phase: "day", round_number: 1, alive_player_ids: ["p1", "p2"] } }),
+    });
+
+    expect(useRoomStore.getState().nightTimer).toBeNull();
+  });
+
+  it("stores the winning team and full role reveal on game_over", () => {
+    captured!.onEvent({
+      type: "game_over",
+      winning_team: "town",
+      roles: [
+        { player_id: "p1", role_key: "mafia", role_display_name: "Mafia", team: "mafia" },
+        { player_id: "p2", role_key: "villager", role_display_name: "Villager", team: "town" },
+      ],
+    });
+
+    const gameOver = useRoomStore.getState().gameOver;
+    expect(gameOver).not.toBeNull();
+    expect(gameOver!.winningTeam).toBe("town");
+    expect(gameOver!.roles).toEqual([
+      { playerId: "p1", roleKey: "mafia", roleDisplayName: "Mafia", team: "mafia" },
+      { playerId: "p2", roleKey: "villager", roleDisplayName: "Villager", team: "town" },
+    ]);
+  });
+
+  it("keeps nightTimer when room_state reports the night phase", () => {
+    captured!.onEvent({ type: "night_timer_started", duration_seconds: 60 });
+    const scheduled = useRoomStore.getState().nightTimer;
+
+    captured!.onEvent({
+      type: "room_state",
+      room: baseRoom({ phase: "in_game", game_state: { phase: "night", round_number: 1, alive_player_ids: ["p1", "p2"] } }),
+    });
+
+    expect(useRoomStore.getState().nightTimer).toEqual(scheduled);
   });
 });

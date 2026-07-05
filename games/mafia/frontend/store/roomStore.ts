@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { RoomSocket } from "@/services/socket";
 import type { Room } from "@/types/room";
-import type { ClientCommand, RoleOut } from "@/types/ws-events";
+import type { ClientCommand, MafiaPickOut, RoleOut } from "@/types/ws-events";
 
 type ConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "closed";
 
@@ -13,13 +13,26 @@ interface EliminationResult {
   eliminatedPlayerId: string | null;
 }
 
+interface RoleReveal {
+  playerId: string;
+  roleKey: string;
+  roleDisplayName: string;
+  team: string;
+}
+
 interface GameOverResult {
   winningTeam: string;
+  roles: RoleReveal[];
 }
 
 interface InvestigationResult {
   targetPlayerId: string;
   team: string;
+}
+
+interface NightTimer {
+  durationSeconds: number;
+  deadlineAt: number;
 }
 
 interface RoomStoreState {
@@ -36,6 +49,8 @@ interface RoomStoreState {
   gameOver: GameOverResult | null;
   investigationResult: InvestigationResult | null;
   votes: Record<string, string>;
+  mafiaPicks: MafiaPickOut[];
+  nightTimer: NightTimer | null;
   connect: (roomCode: string, playerId: string) => void;
   disconnect: () => void;
   sendCommand: (command: ClientCommand) => void;
@@ -55,6 +70,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   gameOver: null,
   investigationResult: null,
   votes: {},
+  mafiaPicks: [],
+  nightTimer: null,
 
   connect: (roomCode, playerId) => {
     get().socket?.close();
@@ -70,8 +87,14 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
             set({
               room: event.room,
               ...(startingNewRound
-                ? { nightResult: null, eliminationResult: null, investigationResult: null, votes: {} }
-                : {}),
+                ? {
+                    nightResult: null,
+                    eliminationResult: null,
+                    investigationResult: null,
+                    votes: {},
+                    mafiaPicks: [],
+                  }
+                : { nightTimer: null }),
             });
             break;
           }
@@ -109,10 +132,31 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
             set({ eliminationResult: { eliminatedPlayerId: event.eliminated_player_id } });
             break;
           case "game_over":
-            set({ gameOver: { winningTeam: event.winning_team } });
+            set({
+              gameOver: {
+                winningTeam: event.winning_team,
+                roles: event.roles.map((reveal) => ({
+                  playerId: reveal.player_id,
+                  roleKey: reveal.role_key,
+                  roleDisplayName: reveal.role_display_name,
+                  team: reveal.team,
+                })),
+              },
+            });
             break;
           case "vote_cast":
             set((state) => ({ votes: { ...state.votes, [event.player_id]: event.target_player_id } }));
+            break;
+          case "mafia_night_picks":
+            set({ mafiaPicks: event.picks });
+            break;
+          case "night_timer_started":
+            set({
+              nightTimer: {
+                durationSeconds: event.duration_seconds,
+                deadlineAt: Date.now() + event.duration_seconds * 1000,
+              },
+            });
             break;
           case "pong":
             break;
@@ -134,6 +178,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       gameOver: null,
       investigationResult: null,
       votes: {},
+      mafiaPicks: [],
+      nightTimer: null,
     });
     socket.connect();
   },

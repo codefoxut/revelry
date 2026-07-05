@@ -51,7 +51,38 @@ class EliminationResultEvent(Event):
     eliminated_player_id: str | None
 
 
+class PlayerRoleReveal(Event):
+    """One player's final role. Only ever included on `GameOverEvent` — a
+    role stops being private information once the game has ended.
+    """
+
+    player_id: str
+    role_key: str
+    role_display_name: str
+    team: str
+
+
 class GameOverEvent(Event):
-    """The game has ended. `winning_team` is a Team value."""
+    """The game has ended. `winning_team` is a Team value. `roles` reveals
+    every player's role now that the game is over, so every screen can
+    render a final summary rather than just the winning team."""
 
     winning_team: str
+    roles: list[PlayerRoleReveal]
+
+
+class MafiaPick(Event):
+    """One living mafia player's current night-action state."""
+
+    player_id: str
+    target_player_id: str | None
+    locked: bool
+
+
+class MafiaTargetsUpdatedEvent(Event):
+    """Live snapshot of every living mafia player's current night pick.
+    Mafia-team eyes only — the WS layer must never broadcast this
+    room-wide.
+    """
+
+    picks: list[MafiaPick]

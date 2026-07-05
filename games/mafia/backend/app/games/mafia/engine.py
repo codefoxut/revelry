@@ -4,15 +4,20 @@ from app.game_engine.base import Command, Event, GameEngine
 from app.games.mafia.commands import (
     AdvancePhaseCommand,
     CastVoteCommand,
+    LockNightActionCommand,
     StartGameCommand,
     SubmitNightActionCommand,
 )
+from app.games.mafia.conflict_resolution import ConflictResolution
 from app.games.mafia.events import (
     EliminationResultEvent,
     GameOverEvent,
     InvestigationResultEvent,
+    MafiaPick,
+    MafiaTargetsUpdatedEvent,
     NightResultEvent,
     PhaseChangedEvent,
+    PlayerRoleReveal,
     RoleAssignedEvent,
 )
 from app.games.mafia.phases import MAFIA_TRANSITIONS, MafiaPhase
@@ -36,9 +41,11 @@ class MafiaGameEngine(GameEngine):
         self._rng = rng if rng is not None else random.Random()
         self._roles: dict[str, Role] = {}
         self._alive: dict[str, bool] = {}
-        self._mafia_votes: dict[str, str] = {}
+        self._mafia_targets: dict[str, str] = {}
+        self._mafia_locked: set[str] = set()
         self._protect_target: str | None = None
         self._votes: dict[str, str] = {}
+        self._conflict_resolution = ConflictResolution.KILL_ANY
 
     @property
     def phase(self) -> MafiaPhase:
@@ -56,20 +63,25 @@ class MafiaGameEngine(GameEngine):
 
     async def handle_command(self, command: Command) -> list[Event]:
         if isinstance(command, StartGameCommand):
-            return self._start_game(command.active_player_ids)
+            return self._start_game(command.active_player_ids, command.conflict_resolution)
         if isinstance(command, AdvancePhaseCommand):
             return self._advance_phase()
         if isinstance(command, SubmitNightActionCommand):
             return self._submit_night_action(command.player_id, command.target_player_id)
         if isinstance(command, CastVoteCommand):
             return self._cast_vote(command.player_id, command.target_player_id)
+        if isinstance(command, LockNightActionCommand):
+            return self._lock_night_action(command.player_id)
         raise ValueError(f"Unsupported command: {type(command).__name__}")
 
-    def _start_game(self, active_player_ids: list[str]) -> list[Event]:
+    def _start_game(
+        self, active_player_ids: list[str], conflict_resolution: ConflictResolution
+    ) -> list[Event]:
         self._machine.transition_to(MafiaPhase.NIGHT)
         self._round_number = 1
         self._roles = assign_roles(active_player_ids, self._rng)
         self._alive = {player_id: True for player_id in active_player_ids}
+        self._conflict_resolution = conflict_resolution
 
         events: list[Event] = [PhaseChangedEvent(phase=self.phase, round_number=self._round_number)]
         events.extend(
@@ -96,10 +108,17 @@ class MafiaGameEngine(GameEngine):
         role = self._roles.get(player_id)
         if role is None or not role.acts_at_night:
             raise InvalidGameStateError("This role has no night action")
+        if role.key in ("mafia", "detective") and target_player_id == player_id:
+            raise InvalidGameStateError(f"{role.display_name} cannot target themselves")
 
         if role.key == "mafia":
-            self._mafia_votes[player_id] = target_player_id
-            return []
+            self._mafia_targets[player_id] = target_player_id
+            # Locking now requires unanimous agreement, so any mafia
+            # changing their pick invalidates the whole team's locks, not
+            # just their own — a teammate's existing lock was only
+            # meaningful while the old agreement held.
+            self._mafia_locked.clear()
+            return [MafiaTargetsUpdatedEvent(picks=self._mafia_picks_snapshot())]
         if role.key == "doctor":
             self._protect_target = target_player_id
             return []
@@ -111,6 +130,37 @@ class MafiaGameEngine(GameEngine):
                 )
             ]
         raise InvalidGameStateError(f"Role {role.key!r} has no night action handling")
+
+    def _lock_night_action(self, player_id: str) -> list[Event]:
+        if self.phase is not MafiaPhase.NIGHT:
+            raise InvalidGameStateError("Night actions can only be locked during the night")
+        if not self.is_alive(player_id):
+            raise InvalidGameStateError("Dead players cannot act")
+
+        role = self._roles.get(player_id)
+        if role is None or role.team is not Team.MAFIA:
+            raise InvalidGameStateError("Only mafia can lock a night-action target")
+        if player_id not in self._mafia_targets:
+            raise InvalidGameStateError("Choose a target before locking it in")
+
+        mafia_ids = [pid for pid, r in self._roles.items() if r.team is Team.MAFIA and self.is_alive(pid)]
+        current_targets = {self._mafia_targets.get(pid) for pid in mafia_ids}
+        if len(current_targets) != 1 or None in current_targets:
+            raise InvalidGameStateError("All mafia must choose the same target before locking in")
+
+        self._mafia_locked.add(player_id)
+        return [MafiaTargetsUpdatedEvent(picks=self._mafia_picks_snapshot())]
+
+    def _mafia_picks_snapshot(self) -> list[MafiaPick]:
+        mafia_ids = [pid for pid, role in self._roles.items() if role.team is Team.MAFIA and self.is_alive(pid)]
+        return [
+            MafiaPick(
+                player_id=pid,
+                target_player_id=self._mafia_targets.get(pid),
+                locked=pid in self._mafia_locked,
+            )
+            for pid in mafia_ids
+        ]
 
     def _cast_vote(self, player_id: str, target_player_id: str) -> list[Event]:
         if self.phase is not MafiaPhase.VOTING:
@@ -142,12 +192,26 @@ class MafiaGameEngine(GameEngine):
         return [PhaseChangedEvent(phase=self.phase, round_number=self._round_number)]
 
     def _resolve_night(self) -> list[Event]:
-        killed = _plurality_target(self._mafia_votes)
+        mafia_ids = [pid for pid, role in self._roles.items() if role.team is Team.MAFIA and self.is_alive(pid)]
+        all_locked = bool(mafia_ids) and all(pid in self._mafia_locked for pid in mafia_ids)
+        agreed_targets = {self._mafia_targets[pid] for pid in mafia_ids} if all_locked else set()
+
+        if all_locked and len(agreed_targets) == 1:
+            killed = next(iter(agreed_targets))
+        elif self._conflict_resolution is ConflictResolution.NO_KILL:
+            killed = None
+        else:  # KILL_ANY: mafia failed to reach consensus, a random living
+            # player dies instead — mafia included — raising the stakes of
+            # not coordinating rather than defaulting to a safe no-kill.
+            alive_ids = [pid for pid, alive in self._alive.items() if alive]
+            killed = self._rng.choice(alive_ids) if alive_ids else None
+
         if killed is not None and killed == self._protect_target:
             killed = None
         if killed is not None:
             self._alive[killed] = False
-        self._mafia_votes.clear()
+        self._mafia_targets.clear()
+        self._mafia_locked.clear()
         self._protect_target = None
 
         winner = self._check_win()
@@ -156,7 +220,7 @@ class MafiaGameEngine(GameEngine):
             return [
                 PhaseChangedEvent(phase=self.phase, round_number=self._round_number),
                 NightResultEvent(eliminated_player_id=killed),
-                GameOverEvent(winning_team=winner.value),
+                GameOverEvent(winning_team=winner.value, roles=self._role_reveal()),
             ]
 
         self._machine.transition_to(MafiaPhase.DAY)
@@ -183,12 +247,23 @@ class MafiaGameEngine(GameEngine):
             self._machine.transition_to(MafiaPhase.GAME_OVER)
             return [
                 PhaseChangedEvent(phase=self.phase, round_number=self._round_number),
-                GameOverEvent(winning_team=winner.value),
+                GameOverEvent(winning_team=winner.value, roles=self._role_reveal()),
             ]
 
         self._machine.transition_to(MafiaPhase.NIGHT)
         self._round_number += 1
         return [PhaseChangedEvent(phase=self.phase, round_number=self._round_number)]
+
+    def _role_reveal(self) -> list[PlayerRoleReveal]:
+        return [
+            PlayerRoleReveal(
+                player_id=player_id,
+                role_key=role.key,
+                role_display_name=role.display_name,
+                team=role.team.value,
+            )
+            for player_id, role in self._roles.items()
+        ]
 
     def _check_win(self) -> Team | None:
         alive_teams = [self._roles[player_id].team for player_id, alive in self._alive.items() if alive]

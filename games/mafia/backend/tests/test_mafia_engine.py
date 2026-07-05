@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from app.games.mafia.commands import AdvancePhaseCommand, StartGameCommand
+from app.games.mafia.conflict_resolution import ConflictResolution
 from app.games.mafia.engine import MafiaGameEngine
 from app.games.mafia.events import RoleAssignedEvent
 from app.games.mafia.phases import MafiaPhase
@@ -48,8 +49,17 @@ def test_advancing_before_start_is_rejected():
 
 
 def test_full_cycle_increments_round_on_return_to_night():
+    # NO_KILL avoids the unseeded RNG's KILL_ANY fallback ending the game
+    # early by happening to hit the sole mafia player — this test only
+    # cares about phase/round cycling, not who (if anyone) dies.
     engine = MafiaGameEngine("ABCDE")
-    asyncio.run(engine.handle_command(StartGameCommand(player_id="host", active_player_ids=_PLAYERS)))
+    asyncio.run(
+        engine.handle_command(
+            StartGameCommand(
+                player_id="host", active_player_ids=_PLAYERS, conflict_resolution=ConflictResolution.NO_KILL
+            )
+        )
+    )
 
     asyncio.run(engine.handle_command(AdvancePhaseCommand(player_id="host")))  # -> DAY
     assert engine.phase == MafiaPhase.DAY

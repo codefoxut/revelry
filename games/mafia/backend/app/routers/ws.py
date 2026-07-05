@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.platform.disconnect_grace import DisconnectGraceManager
 from app.platform.game_session_manager import GameSessionManager, game_session_manager as _game_session_manager
+from app.platform.night_timer import NightTimerManager
 from app.platform.room import RoomPhase
 from app.platform.room_manager import RoomManager
 from app.routers.rooms import get_room_manager
@@ -17,6 +18,7 @@ router = APIRouter()
 
 _connection_manager = ConnectionManager()
 _disconnect_grace_manager = DisconnectGraceManager()
+_night_timer_manager = NightTimerManager()
 
 # Codes above 4000 are the application-reserved range for WS close codes.
 _CLOSE_ROOM_OR_PLAYER_NOT_FOUND = 4404
@@ -34,6 +36,10 @@ def get_disconnect_grace_manager() -> DisconnectGraceManager:
     return _disconnect_grace_manager
 
 
+def get_night_timer_manager() -> NightTimerManager:
+    return _night_timer_manager
+
+
 @router.websocket("/ws/{room_code}")
 async def room_socket(
     websocket: WebSocket,
@@ -43,6 +49,7 @@ async def room_socket(
     connections: ConnectionManager = Depends(get_connection_manager),
     games: GameSessionManager = Depends(get_game_session_manager),
     grace: DisconnectGraceManager = Depends(get_disconnect_grace_manager),
+    night_timer: NightTimerManager = Depends(get_night_timer_manager),
 ) -> None:
     room_code = room_code.upper()
     room = await manager.get_room(room_code)
@@ -92,6 +99,7 @@ async def room_socket(
                 room_manager=manager,
                 connection_manager=connections,
                 game_session_manager=games,
+                night_timer_manager=night_timer,
             )
             if should_close:
                 await websocket.close(code=1000)

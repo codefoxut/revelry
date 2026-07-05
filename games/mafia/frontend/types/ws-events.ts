@@ -57,15 +57,39 @@ export interface EliminationResultEvent {
   eliminated_player_id: string | null;
 }
 
+export interface RoleRevealOut {
+  player_id: string;
+  role_key: string;
+  role_display_name: string;
+  team: string;
+}
+
 export interface GameOverEvent {
   type: "game_over";
   winning_team: string;
+  roles: RoleRevealOut[];
 }
 
 export interface VoteCastEvent {
   type: "vote_cast";
   player_id: string;
   target_player_id: string;
+}
+
+export interface MafiaPickOut {
+  player_id: string;
+  target_player_id: string | null;
+  locked: boolean;
+}
+
+export interface MafiaNightPicksEvent {
+  type: "mafia_night_picks";
+  picks: MafiaPickOut[];
+}
+
+export interface NightTimerStartedEvent {
+  type: "night_timer_started";
+  duration_seconds: number;
 }
 
 export type ServerEvent =
@@ -79,7 +103,9 @@ export type ServerEvent =
   | NightResultEvent
   | EliminationResultEvent
   | GameOverEvent
-  | VoteCastEvent;
+  | VoteCastEvent
+  | MafiaNightPicksEvent
+  | NightTimerStartedEvent;
 
 // ---- Client -> Server ----
 
@@ -109,6 +135,7 @@ export interface LeaveRoomCommand {
 
 export interface StartGameCommand {
   type: "start_game";
+  conflict_resolution: "kill_any" | "no_kill";
 }
 
 export interface AdvancePhaseCommand {
@@ -125,6 +152,10 @@ export interface CastVoteCommand {
   target_player_id: string;
 }
 
+export interface LockNightActionCommand {
+  type: "lock_night_action";
+}
+
 export type ClientCommand =
   | PingCommand
   | SetReadyCommand
@@ -134,4 +165,5 @@ export type ClientCommand =
   | StartGameCommand
   | AdvancePhaseCommand
   | NightActionCommand
-  | CastVoteCommand;
+  | CastVoteCommand
+  | LockNightActionCommand;

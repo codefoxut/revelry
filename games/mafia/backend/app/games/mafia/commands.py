@@ -1,4 +1,5 @@
 from app.game_engine.base import Command
+from app.games.mafia.conflict_resolution import ConflictResolution
 
 
 class StartGameCommand(Command):
@@ -12,6 +13,7 @@ class StartGameCommand(Command):
     """
 
     active_player_ids: list[str]
+    conflict_resolution: ConflictResolution = ConflictResolution.KILL_ANY
 
 
 class AdvancePhaseCommand(Command):
@@ -36,3 +38,10 @@ class CastVoteCommand(Command):
     """
 
     target_player_id: str
+
+
+class LockNightActionCommand(Command):
+    """A mafia player locking in their current night-action target. Only
+    valid once that player has already submitted a target via
+    SubmitNightActionCommand; changing the target afterward un-locks it.
+    """

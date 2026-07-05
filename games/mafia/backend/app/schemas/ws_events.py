@@ -72,9 +72,20 @@ class EliminationResultEvent(BaseModel):
     eliminated_player_id: str | None
 
 
+class RoleRevealOut(BaseModel):
+    """One player's final role, only ever sent alongside `GameOverEvent` —
+    a role stops being private information once the game has ended."""
+
+    player_id: str
+    role_key: str
+    role_display_name: str
+    team: str
+
+
 class GameOverEvent(BaseModel):
     type: Literal["game_over"] = "game_over"
     winning_team: str
+    roles: list[RoleRevealOut]
 
 
 class VoteCastEvent(BaseModel):
@@ -85,6 +96,31 @@ class VoteCastEvent(BaseModel):
     type: Literal["vote_cast"] = "vote_cast"
     player_id: str
     target_player_id: str
+
+
+class MafiaPickOut(BaseModel):
+    player_id: str
+    target_player_id: str | None
+    locked: bool
+
+
+class MafiaNightPicksEvent(BaseModel):
+    """Every living mafia player's current night pick. Sent only to mafia
+    sockets — never broadcast to the whole room.
+    """
+
+    type: Literal["mafia_night_picks"] = "mafia_night_picks"
+    picks: list[MafiaPickOut]
+
+
+class NightTimerStartedEvent(BaseModel):
+    """Public: a new night decision window has started, giving mafia
+    `duration_seconds` to lock in a shared target before the night
+    auto-resolves using the host's chosen conflict-resolution mode.
+    """
+
+    type: Literal["night_timer_started"] = "night_timer_started"
+    duration_seconds: float
 
 
 # ---- Client -> Server ----
@@ -124,6 +160,7 @@ class StartGameCommand(BaseModel):
     """
 
     type: Literal["start_game"] = "start_game"
+    conflict_resolution: Literal["kill_any", "no_kill"] = "kill_any"
 
 
 class AdvancePhaseCommand(BaseModel):
@@ -148,3 +185,12 @@ class CastVoteCommand(BaseModel):
 
     type: Literal["cast_vote"] = "cast_vote"
     target_player_id: str
+
+
+class LockNightActionCommand(BaseModel):
+    """A mafia player locking in their currently-submitted night-action
+    target. Only valid once a target has already been submitted via
+    NightActionCommand.
+    """
+
+    type: Literal["lock_night_action"] = "lock_night_action"

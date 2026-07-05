@@ -7,9 +7,12 @@ import { clearPlayerId } from "@/lib/session";
 import { GameView } from "./GameView";
 import { avatarEmoji } from "@/lib/avatars";
 import type { Player } from "@/types/room";
+import type { StartGameCommand } from "@/types/ws-events";
 
 // Mirrors MAFIA_MODULE.min_players in app/games/mafia/__init__.py.
 const MIN_PLAYERS_TO_START = 4;
+
+type ConflictResolution = StartGameCommand["conflict_resolution"];
 
 export function LobbyView() {
   const router = useRouter();
@@ -21,6 +24,7 @@ export function LobbyView() {
   const sendCommand = useRoomStore((state) => state.sendCommand);
   const disconnect = useRoomStore((state) => state.disconnect);
   const [copied, setCopied] = useState(false);
+  const [conflictResolution, setConflictResolution] = useState<ConflictResolution>("kill_any");
 
   if (kicked) {
     return (
@@ -63,7 +67,7 @@ export function LobbyView() {
   }
 
   function startGame() {
-    sendCommand({ type: "start_game" });
+    sendCommand({ type: "start_game", conflict_resolution: conflictResolution });
   }
 
   function leave() {
@@ -162,6 +166,35 @@ export function LobbyView() {
 
         {!inGame && isHost && (
           <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-xs uppercase tracking-wide text-zinc-500">
+                If mafia can&rsquo;t agree
+              </span>
+              <div className="flex overflow-hidden rounded-full border border-zinc-700">
+                <button
+                  type="button"
+                  onClick={() => setConflictResolution("kill_any")}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                    conflictResolution === "kill_any"
+                      ? "bg-rose-500 text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  Kill someone at random
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConflictResolution("no_kill")}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                    conflictResolution === "no_kill"
+                      ? "bg-rose-500 text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  No one dies
+                </button>
+              </div>
+            </div>
             <button
               type="button"
               onClick={startGame}

@@ -5,9 +5,11 @@ from app.games.mafia import DISPLAY_NAME, MIN_PLAYERS
 from app.games.mafia.commands import (
     AdvancePhaseCommand,
     CastVoteCommand,
+    LockNightActionCommand,
     StartGameCommand,
     SubmitNightActionCommand,
 )
+from app.games.mafia.conflict_resolution import ConflictResolution
 from app.platform.exceptions import (
     GameAlreadyStartedError,
     GameNotStartedError,
@@ -36,7 +38,12 @@ class GameSessionManager:
         self._room_manager = room_manager
         self._engine_store = engine_store
 
-    async def start_game(self, room_code: str, requester_id: str) -> tuple[Room, list[Event]]:
+    async def start_game(
+        self,
+        room_code: str,
+        requester_id: str,
+        conflict_resolution: ConflictResolution = ConflictResolution.KILL_ANY,
+    ) -> tuple[Room, list[Event]]:
         room = await self._room_manager.require_room(room_code)
         if room.host_player_id != requester_id:
             raise PermissionDeniedError("Only the host can start the game")
@@ -53,7 +60,11 @@ class GameSessionManager:
 
         engine = MafiaGameEngine(room_code)
         events = await engine.handle_command(
-            StartGameCommand(player_id=requester_id, active_player_ids=active_player_ids)
+            StartGameCommand(
+                player_id=requester_id,
+                active_player_ids=active_player_ids,
+                conflict_resolution=conflict_resolution,
+            )
         )
         await self._engine_store.save(room_code, engine)
 
@@ -79,6 +90,13 @@ class GameSessionManager:
         return await engine.handle_command(
             SubmitNightActionCommand(player_id=player_id, target_player_id=target_player_id)
         )
+
+    async def lock_night_action(self, room_code: str, player_id: str) -> list[Event]:
+        engine = await self._engine_store.get(room_code)
+        if engine is None:
+            raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
+
+        return await engine.handle_command(LockNightActionCommand(player_id=player_id))
 
     async def cast_vote(self, room_code: str, player_id: str, target_player_id: str) -> list[Event]:
         engine = await self._engine_store.get(room_code)

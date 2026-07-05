@@ -41,6 +41,14 @@ class ConnectionManager:
         if websocket is not None:
             await websocket.send_json(event.model_dump(mode="json"))
 
+    async def send_to_players(self, room_code: str, player_ids: list[str], event: BaseModel) -> None:
+        payload = event.model_dump(mode="json")
+        room_connections = self._connections.get(room_code, {})
+        for player_id in player_ids:
+            websocket = room_connections.get(player_id)
+            if websocket is not None:
+                await websocket.send_json(payload)
+
     async def broadcast(
         self,
         room_code: str,

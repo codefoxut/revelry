@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRoomStore } from "@/store/roomStore";
 import { avatarEmoji } from "@/lib/avatars";
 import type { Player } from "@/types/room";
+import type { MafiaPickOut } from "@/types/ws-events";
 
 export function GameView() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export function GameView() {
   const gameOver = useRoomStore((state) => state.gameOver);
   const investigationResult = useRoomStore((state) => state.investigationResult);
   const votes = useRoomStore((state) => state.votes);
+  const mafiaPicks = useRoomStore((state) => state.mafiaPicks);
+  const nightTimer = useRoomStore((state) => state.nightTimer);
   const sendCommand = useRoomStore((state) => state.sendCommand);
 
   const phase = room?.game_state?.phase;
@@ -28,6 +31,10 @@ export function GameView() {
   const aliveIds = new Set(room.game_state.alive_player_ids);
   const selfAlive = selfPlayerId ? aliveIds.has(selfPlayerId) : false;
   const alivePlayers = room.players.filter((player) => aliveIds.has(player.id));
+  const nightActionTargets =
+    myRole?.key === "mafia" || myRole?.key === "detective"
+      ? alivePlayers.filter((player) => player.id !== selfPlayerId)
+      : alivePlayers;
 
   function submitNightAction(targetId: string) {
     sendCommand({ type: "night_action", target_player_id: targetId });
@@ -35,6 +42,10 @@ export function GameView() {
 
   function submitVote(targetId: string) {
     sendCommand({ type: "cast_vote", target_player_id: targetId });
+  }
+
+  function lockNightAction() {
+    sendCommand({ type: "lock_night_action" });
   }
 
   function advancePhase() {
@@ -50,6 +61,27 @@ export function GameView() {
         <h1 className="text-3xl font-semibold capitalize tracking-tight">
           {gameOver.winningTeam} wins
         </h1>
+
+        <div className="flex w-full max-w-sm flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+          <span className="text-center text-xs uppercase tracking-wide text-zinc-500">
+            Final roles
+          </span>
+          <ul className="flex flex-col gap-1">
+            {gameOver.roles.map((reveal) => (
+              <li
+                key={reveal.playerId}
+                className="flex items-center justify-between text-sm text-zinc-300"
+              >
+                <span>
+                  {playerName(room.players, reveal.playerId)}
+                  {reveal.playerId === selfPlayerId ? " (you)" : ""}
+                </span>
+                <span className="capitalize text-rose-400">{reveal.roleDisplayName}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <button
           type="button"
           onClick={() => router.push("/")}
@@ -83,6 +115,8 @@ export function GameView() {
           {phase} &middot; Round {roundNumber}
         </span>
 
+        {phase === "night" && nightTimer && <NightCountdown deadlineAt={nightTimer.deadlineAt} />}
+
         {investigationResult && phase === "night" && (
           <p className="text-center text-sm text-zinc-300">
             Investigation result: that player is on the{" "}
@@ -110,14 +144,26 @@ export function GameView() {
           <TargetPicker
             key={`night-${roundNumber}`}
             label="Choose your target"
-            players={alivePlayers}
+            players={nightActionTargets}
             onSelect={submitNightAction}
           />
         )}
+        {phase === "night" && selfAlive && myRole?.team === "mafia" && (
+          <MafiaTeamPanel
+            key={`mafia-${roundNumber}`}
+            players={room.players}
+            picks={mafiaPicks}
+            selfPlayerId={selfPlayerId}
+            onLock={lockNightAction}
+          />
+        )}
         {phase === "night" && selfAlive && !myRole?.acts_at_night && (
-          <p className="text-center text-sm text-zinc-600">
-            Your role has no night action. Waiting for the others&hellip;
-          </p>
+          <TargetPicker
+            key={`night-decoy-${roundNumber}`}
+            label="Choose your target"
+            players={alivePlayers}
+            onSelect={noop}
+          />
         )}
         {phase === "night" && !selfAlive && (
           <p className="text-center text-sm text-zinc-600">You&rsquo;re out, but you can keep watching.</p>
@@ -195,6 +241,74 @@ function TargetPicker({
   );
 }
 
+function NightCountdown({ deadlineAt }: { deadlineAt: number }) {
+  const [remainingMs, setRemainingMs] = useState(() => Math.max(0, deadlineAt - Date.now()));
+
+  useEffect(() => {
+    setRemainingMs(Math.max(0, deadlineAt - Date.now()));
+    const interval = setInterval(() => {
+      setRemainingMs(Math.max(0, deadlineAt - Date.now()));
+    }, 250);
+    return () => clearInterval(interval);
+  }, [deadlineAt]);
+
+  const secondsLeft = Math.ceil(remainingMs / 1000);
+
+  return (
+    <p className="text-center text-sm text-zinc-500">
+      Mafia has <span className="font-medium text-rose-400">{secondsLeft}s</span> left to decide.
+    </p>
+  );
+}
+
+function MafiaTeamPanel({
+  players,
+  picks,
+  selfPlayerId,
+  onLock,
+}: {
+  players: Player[];
+  picks: MafiaPickOut[];
+  selfPlayerId: string | null;
+  onLock: () => void;
+}) {
+  const selfPick = picks.find((pick) => pick.player_id === selfPlayerId);
+  const canLock =
+    picks.length > 0 &&
+    picks.every((pick) => pick.target_player_id && pick.target_player_id === picks[0].target_player_id);
+  const isLocked = selfPick?.locked ?? false;
+
+  return (
+    <div className="flex w-full flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+      <span className="text-center text-xs uppercase tracking-wide text-zinc-500">Mafia team</span>
+      <ul className="flex flex-col gap-1">
+        {picks.map((pick) => (
+          <li
+            key={pick.player_id}
+            className="flex items-center justify-between text-sm text-zinc-300"
+          >
+            <span>
+              {pick.player_id === selfPlayerId ? "You" : playerName(players, pick.player_id)}
+            </span>
+            <span className={pick.locked ? "text-emerald-400" : "text-zinc-500"}>
+              {pick.target_player_id ? playerName(players, pick.target_player_id) : "still choosing…"}
+              {pick.locked ? " (locked)" : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={onLock}
+        disabled={!canLock}
+        className="h-10 rounded-full bg-rose-500 px-6 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+      >
+        {isLocked ? "Locked ✓" : "Lock target"}
+      </button>
+    </div>
+  );
+}
+
 function countVotes(votes: Record<string, string>): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const target of Object.values(votes)) {
@@ -206,3 +320,9 @@ function countVotes(votes: Record<string, string>): Record<string, number> {
 function playerName(players: Player[], playerId: string): string {
   return players.find((player) => player.id === playerId)?.display_name ?? "Someone";
 }
+
+// Villagers get this same picker during the night phase purely so their screen
+// looks identical to a power role's — nothing is sent to the server. Without
+// it, only mafia/doctor/detective would be visibly tapping their phones,
+// telegraphing who holds a power role to anyone glancing around the table.
+function noop() {}

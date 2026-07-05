@@ -286,15 +286,23 @@ def test_advance_phase_cycles_and_broadcasts(isolated_manager):
         socket.send_json({"type": "start_game"})
         socket.receive_json()  # role_assigned
         socket.receive_json()  # room_state: night, round 1
+        socket.receive_json()  # night_timer_started
 
         socket.send_json({"type": "advance_phase"})
-        night_result = socket.receive_json()  # no mafia vote cast -> no kill
-        day_update = socket.receive_json()
+        night_result = socket.receive_json()  # no mafia lock/consensus -> KILL_ANY fallback kills someone
+        # An unseeded RNG means the fallback could kill the sole mafia and
+        # end the game immediately — in that case a game_over broadcast
+        # lands before room_state, so drain to it either way.
+        update = socket.receive_json()
+        if update["type"] != "room_state":
+            update = socket.receive_json()
 
     assert night_result["type"] == "night_result"
-    assert night_result["eliminated_player_id"] is None
-    game_state = day_update["room"]["game_state"]
-    assert game_state["phase"] == "day"
+    # No mafia locked a target, so the default KILL_ANY fallback kills a
+    # random living player instead of no one — mafia included.
+    assert night_result["eliminated_player_id"] is not None
+    game_state = update["room"]["game_state"]
+    assert game_state["phase"] in {"day", "game_over"}
     assert game_state["round_number"] == 1
 
 
