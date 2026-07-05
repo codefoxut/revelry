@@ -32,7 +32,7 @@ Modern party games for friends, families, and teams.
 ✅ Charades
 ⬜ Truth or Dare
 ⬜ Heads Up
-⬜ Pictionary
+✅ Pictionary
 ✅ Mafia
 ⬜ Codenames
 ⬜ Would You Rather
@@ -66,3 +66,16 @@ make run
 ```
 
 Open http://localhost:8080.
+
+### [Pictionary](games/pictionary)
+
+Draw-and-guess party game — online AI-generated clues or offline word bank,
+chosen at setup.
+
+```bash
+cd games/pictionary
+echo "ANTHROPIC_API_KEY=your-key-here" > .env
+make run
+```
+
+Open http://localhost:9090.

@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎨 Pictionary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design tokens ─────────────────────────────────── */
+    :root {
+      --bg:          #080820;
+      --surface:     #10102e;
+      --card:        #16163a;
+      --border:      rgba(255,255,255,0.08);
+      --team-a:      #4361ee;
+      --team-b:      #f72585;
+      --gold:        #ffd60a;
+      --teal:        #00f5d4;
+      --text:        #f0f0ff;
+      --muted:       rgba(240,240,255,0.5);
+      --t-green:     #06d6a0;
+      --t-yellow:    #ffd166;
+      --t-red:       #ef476f;
+      --radius:      18px;
+      --shadow:      0 12px 40px rgba(0,0,0,0.5);
+      --glow-a:      0 0 30px rgba(67,97,238,0.4);
+      --glow-b:      0 0 30px rgba(247,37,133,0.4);
+    }
+
+    /* ── Reset & base ───────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 60% 80% at 15% 50%, rgba(67,97,238,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 80% at 85% 50%, rgba(247,37,133,0.12) 0%, transparent 70%);
+      color: var(--text);
+      font-family: 'Nunito', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Layout helpers ─────────────────────────────────── */
+    .flex-center  { display:flex; align-items:center; justify-content:center; }
+    .flex-col     { flex-direction:column; }
+    .gap-sm       { gap:12px; }
+    .gap-md       { gap:20px; }
+    .gap-lg       { gap:32px; }
+
+    /* ── Glass card ─────────────────────────────────────── */
+    .glass {
+      background: rgba(22,22,60,0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    /* ── Scrollbar ──────────────────────────────────────── */
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.2); border-radius:3px; }
+
+    /* ══════════════════════════════════════════════════════
+       SETUP SCREEN
+    ══════════════════════════════════════════════════════ */
+    .setup-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      gap: 40px;
+    }
+
+    .logo-area {
+      text-align: center;
+    }
+
+    .logo-title {
+      font-family: 'Boogaloo', cursive;
+      font-size: clamp(3.5rem, 10vw, 6rem);
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, var(--team-a), var(--teal), var(--team-b));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 30px rgba(67,97,238,0.5));
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+
+    .logo-sub {
+      color: var(--muted);
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-top: 8px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    @keyframes pulse-glow {
+      0%,100% { filter: drop-shadow(0 0 20px rgba(67,97,238,0.4)); }
+      50%      { filter: drop-shadow(0 0 50px rgba(247,37,133,0.6)); }
+    }
+
+    .setup-card {
+      width: 100%;
+      max-width: 560px;
+      padding: 40px;
+    }
+
+    .setup-card h2 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .mode-toggle {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 14px 12px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      color: var(--muted);
+      font-family: 'Nunito', sans-serif;
+      font-weight: 800;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .mode-btn.active {
+      border-color: var(--teal);
+      color: var(--text);
+      background: rgba(0,245,212,0.1);
+    }
+
+    .name-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .name-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .name-row .team-label {
+      width: 92px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    .name-row .team-input { flex: 1; }
+
+    .remove-name-btn {
+      background: rgba(239,71,111,0.15);
+      color: var(--t-red);
+      border: none;
+      border-radius: 8px;
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+
+    .team-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .team-input {
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 14px 16px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      text-align: center;
+    }
+
+    .team-input:focus { border-color: var(--teal); box-shadow: 0 0 0 4px rgba(0,245,212,0.2); }
+
+    /* ── Buttons ─────────────────────────────────────────── */
+    .btn {
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      padding: 16px 28px;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--team-a), #7b61ff);
+      color: #fff;
+      width: 100%;
+      box-shadow: 0 6px 24px rgba(67,97,238,0.45);
+    }
+    .btn-primary:hover:not(:disabled) { box-shadow: 0 8px 32px rgba(67,97,238,0.65); transform: translateY(-2px); }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #f59e0b, var(--gold));
+      color: #000;
+      box-shadow: 0 6px 24px rgba(255,214,10,0.35);
+    }
+    .btn-gold:hover:not(:disabled) { box-shadow: 0 8px 32px rgba(255,214,10,0.55); transform: translateY(-2px); }
+
+    .btn-success {
+      background: linear-gradient(135deg, #059669, var(--t-green));
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(6,214,160,0.35);
+    }
+    .btn-success:hover:not(:disabled) { box-shadow: 0 8px 28px rgba(6,214,160,0.55); transform: translateY(-2px); }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #dc2626, var(--t-red));
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(239,71,111,0.3);
+    }
+    .btn-danger:hover:not(:disabled) { box-shadow: 0 8px 28px rgba(239,71,111,0.5); transform: translateY(-2px); }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.07);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.12); color: var(--text); }
+
+    /* ══════════════════════════════════════════════════════
+       GAME HEADER
+    ══════════════════════════════════════════════════════ */
+    .game-header {
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(8,8,32,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-title {
+      font-family: 'Boogaloo', cursive;
+      font-size: 1.4rem;
+      letter-spacing: 3px;
+      text-align: center;
+      background: linear-gradient(135deg, var(--team-a), var(--team-b));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .score-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .score-panel {
+      padding: 10px 18px;
+      min-width: 96px;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      border: 1.5px solid var(--border);
+      opacity: 0.6;
+      transition: box-shadow 0.4s, border-color 0.4s, opacity 0.4s;
+    }
+
+    .score-panel.active {
+      opacity: 1;
+      border-color: var(--accent);
+      box-shadow: 0 0 30px var(--accent-glow);
+    }
+
+    .score-team-name {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .score-value {
+      font-family: 'Boogaloo', cursive;
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CATEGORY SELECTION
+    ══════════════════════════════════════════════════════ */
+    .category-screen {
+      padding: 32px 24px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .turn-banner {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .turn-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .turn-team {
+      font-family: 'Boogaloo', cursive;
+      font-size: 2.4rem;
+      margin-top: 4px;
+    }
+
+    .pick-label {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+    }
+
+    .category-card {
+      padding: 24px 16px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      border: 2px solid transparent;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      background: var(--card);
+    }
+
+    .category-card:hover {
+      transform: translateY(-6px) scale(1.03);
+    }
+
+    .cat-emoji {
+      font-size: 2.8rem;
+      line-height: 1;
+    }
+
+    .cat-name {
+      font-size: 0.95rem;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       GAME CARD (playing phase)
+    ══════════════════════════════════════════════════════ */
+    .game-screen {
+      padding: 24px;
+      max-width: 840px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Options card */
+    .options-card {
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .options-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.06;
+      background: var(--cat-color, var(--team-a));
+      pointer-events: none;
+    }
+
+    .options-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .options-cat-emoji { font-size: 2rem; }
+
+    .options-cat-name {
+      font-family: 'Boogaloo', cursive;
+      font-size: 1.6rem;
+      color: var(--cat-color, var(--team-a));
+    }
+
+    .options-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .option-item {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 16px 20px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 2px solid rgba(255,255,255,0.07);
+      transition: background 0.3s, border-color 0.3s, transform 0.3s;
+    }
+
+    .option-item.selected {
+      border-color: var(--gold);
+      background: rgba(255,214,10,0.08);
+      transform: scale(1.02);
+      box-shadow: 0 0 20px rgba(255,214,10,0.2);
+    }
+
+    .option-num {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Boogaloo', cursive;
+      font-size: 1.4rem;
+      background: rgba(255,255,255,0.08);
+      flex-shrink: 0;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .option-item.selected .option-num {
+      background: var(--gold);
+      color: #000;
+    }
+
+    .option-text {
+      font-size: 1.15rem;
+      font-weight: 700;
+      transition: color 0.3s;
+    }
+
+    .option-item.selected .option-text { color: var(--gold); }
+
+    /* ── Middle row: dice + timer ────────────────────────── */
+    .dice-timer-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    /* Dice */
+    .dice-panel {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .dice-panel-title {
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .dice-face {
+      width: 100px;
+      height: 100px;
+      border-radius: 22px;
+      background: linear-gradient(145deg, #1e1e50, #2a2a70);
+      border: 3px solid rgba(255,255,255,0.15);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .dice-face.rolling {
+      animation: dice-shake 0.1s ease-in-out infinite;
+    }
+
+    .dice-dots {
+      display: grid;
+      width: 64px;
+      height: 64px;
+      position: relative;
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 8px rgba(255,214,10,0.6);
+      position: absolute;
+    }
+
+    /* Dot positions for 1-4 */
+    .dots-1 .dot:nth-child(1) { top:50%; left:50%; transform:translate(-50%,-50%); }
+
+    .dots-2 .dot:nth-child(1) { top:15%; right:15%; }
+    .dots-2 .dot:nth-child(2) { bottom:15%; left:15%; }
+
+    .dots-3 .dot:nth-child(1) { top:15%; right:15%; }
+    .dots-3 .dot:nth-child(2) { top:50%; left:50%; transform:translate(-50%,-50%); }
+    .dots-3 .dot:nth-child(3) { bottom:15%; left:15%; }
+
+    .dots-4 .dot:nth-child(1) { top:15%; left:15%; }
+    .dots-4 .dot:nth-child(2) { top:15%; right:15%; }
+    .dots-4 .dot:nth-child(3) { bottom:15%; left:15%; }
+    .dots-4 .dot:nth-child(4) { bottom:15%; right:15%; }
+
+    .dice-empty-hint {
+      font-size: 2rem;
+      opacity: 0.3;
+    }
+
+    @keyframes dice-shake {
+      0%   { transform: rotate(-5deg) scale(1.05); }
+      50%  { transform: rotate(5deg) scale(1.08); }
+      100% { transform: rotate(-5deg) scale(1.05); }
+    }
+
+    /* Timer */
+    .timer-panel {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .timer-panel-title {
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .timer-ring {
+      position: relative;
+      width: 110px;
+      height: 110px;
+    }
+
+    .timer-svg {
+      transform: rotate(-90deg);
+      width: 110px;
+      height: 110px;
+    }
+
+    .timer-bg-circle {
+      fill: none;
+      stroke: rgba(255,255,255,0.08);
+      stroke-width: 8;
+    }
+
+    .timer-progress-circle {
+      fill: none;
+      stroke-width: 8;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear, stroke 0.5s;
+    }
+
+    .timer-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .timer-number {
+      font-family: 'Boogaloo', cursive;
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    @keyframes timer-pulse {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.08); }
+    }
+
+    .timer-number.critical { animation: timer-pulse 0.5s ease-in-out infinite; }
+
+    /* ── Action buttons ──────────────────────────────────── */
+    .actions-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .actions-row .btn { font-size: 0.95rem; }
+
+    /* ── Celebration overlay ─────────────────────────────── */
+    .celebration-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+
+    .celebration-card {
+      padding: 48px 56px;
+      text-align: center;
+      max-width: 440px;
+      animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes pop-in {
+      from { transform: scale(0.6); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    .guesser-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .guesser-chip { min-width: 110px; }
+
+    .celebration-icon { font-size: 4rem; margin-bottom: 16px; display: block; }
+    .celebration-title {
+      font-family: 'Boogaloo', cursive;
+      font-size: 2.8rem;
+      margin-bottom: 8px;
+    }
+
+    .celebration-title.correct { color: var(--t-green); }
+    .celebration-title.timeout { color: var(--t-red); }
+
+    .celebration-message {
+      font-size: 1.1rem;
+      color: var(--muted);
+      margin-bottom: 32px;
+    }
+
+    /* ── Confetti particles ──────────────────────────────── */
+    .confetti-container {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 99;
+      overflow: hidden;
+    }
+
+    .confetti-piece {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: -10px;
+      animation: confetti-fall linear forwards;
+      border-radius: 2px;
+    }
+
+    @keyframes confetti-fall {
+      to {
+        transform: translateY(110vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+
+    /* ── Score increment flash ───────────────────────────── */
+    @keyframes score-pop {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.4); color: var(--gold); }
+      100% { transform: scale(1); }
+    }
+
+    .score-pop { animation: score-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+    /* ── Transitions ─────────────────────────────────────── */
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.25s, transform 0.25s; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(16px); }
+
+    .slide-enter-active, .slide-leave-active { transition: opacity 0.3s, transform 0.3s; }
+    .slide-enter-from { opacity: 0; transform: translateX(40px); }
+    .slide-leave-to   { opacity: 0; transform: translateX(-40px); }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .dice-timer-row     { grid-template-columns: 1fr; }
+      .actions-row        { grid-template-columns: 1fr; }
+      .category-grid      { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══════════════ SETUP ═══════════════ -->
+  <transition name="fade">
+    <div v-if="phase === 'setup'" class="setup-screen">
+      <div class="logo-area">
+        <div class="logo-title">PICTIONARY</div>
+        <div class="logo-sub">draw · guess · win</div>
+      </div>
+
+      <div class="glass setup-card">
+        <h2>Set up your game</h2>
+
+        <div v-if="onlineAvailable" class="mode-toggle">
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: dataMode === 'online' }"
+            @click="setDataMode('online')"
+          >🌐 &nbsp;Online (AI)</button>
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: dataMode === 'offline' }"
+            @click="setDataMode('offline')"
+          >📴 &nbsp;Offline (Local)</button>
+        </div>
+        <div v-else style="font-size:0.8rem;color:var(--muted);text-align:center;margin-bottom:20px;">
+          📴 Offline mode only — no ANTHROPIC_API_KEY configured
+        </div>
+
+        <div class="mode-toggle">
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: mode === 'teams' }"
+            @click="setMode('teams')"
+          >👥 &nbsp;Teams</button>
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: mode === 'individual' }"
+            @click="setMode('individual')"
+          >🧑 &nbsp;Individual Players</button>
+        </div>
+
+        <div class="name-list">
+          <div v-for="(name, idx) in setupNames" :key="idx" class="name-row">
+            <label class="team-label" :style="{ color: palette(idx).c }">
+              {{ mode === 'teams' ? 'Team ' + (idx + 1) : 'Player ' + (idx + 1) }}
+            </label>
+            <input
+              class="team-input"
+              v-model="setupNames[idx]"
+              :placeholder="mode === 'teams' ? 'Team ' + (idx + 1) : 'Player ' + (idx + 1)"
+              maxlength="20"
+              @keyup.enter="startGame"
+            />
+            <button
+              v-if="setupNames.length > minParticipants"
+              type="button"
+              class="remove-name-btn"
+              @click="removeSetupName(idx)"
+            >✕</button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-ghost"
+          style="width:100%;margin-bottom:24px"
+          :disabled="setupNames.length >= maxParticipants"
+          @click="addSetupName"
+        >
+          ＋ &nbsp;Add {{ mode === 'teams' ? 'Team' : 'Player' }}
+        </button>
+
+        <button class="btn btn-primary" @click="startGame">
+          🎨 &nbsp;Start Game
+        </button>
+      </div>
+    </div>
+  </transition>
+
+  <!-- ═══════════════ GAME (header + phases) ═══════════════ -->
+  <div v-if="phase !== 'setup'">
+
+    <!-- HEADER -->
+    <header class="game-header">
+      <div class="header-title">PICTIONARY</div>
+      <div class="score-strip">
+        <div
+          v-for="(p, idx) in participants"
+          :key="idx"
+          class="glass score-panel"
+          :class="{ active: idx === currentIdx }"
+          :style="{ '--accent': palette(idx).c, '--accent-glow': palette(idx).glow }"
+        >
+          <div class="score-team-name" :style="{ color: palette(idx).c }">{{ p.name }}</div>
+          <div class="score-value" :class="{ 'score-pop': scorePop[idx] }">{{ p.score }}</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── CATEGORY SELECTION ─────────────────────── -->
+    <transition name="slide">
+      <div v-if="phase === 'category'" class="category-screen">
+        <div class="turn-banner">
+          <div class="turn-label">it's time for</div>
+          <div
+            class="turn-team"
+            :style="{ color: palette(currentIdx).c, textShadow: '0 0 30px ' + palette(currentIdx).glow }"
+          >
+            {{ currentParticipant.name }}
+          </div>
+        </div>
+        <div class="pick-label">Pick a category to draw from ↓</div>
+        <div class="category-grid">
+          <div
+            v-for="cat in categories"
+            :key="cat.id"
+            class="glass category-card"
+            :style="{ '--hover-color': cat.color }"
+            @click="selectCategory(cat.id)"
+            @mouseenter="e => e.currentTarget.style.borderColor = cat.color"
+            @mouseleave="e => e.currentTarget.style.borderColor = 'transparent'"
+          >
+            <span class="cat-emoji">{{ cat.emoji }}</span>
+            <span class="cat-name" :style="{ color: cat.color }">{{ cat.name }}</span>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ─── PLAYING ────────────────────────────────── -->
+    <transition name="slide">
+      <div v-if="phase === 'card' && currentCard" class="game-screen">
+
+        <!-- Options card -->
+        <div
+          class="glass options-card"
+          :style="{ '--cat-color': currentCard.category_color }"
+        >
+          <div class="options-header">
+            <span class="options-cat-emoji">{{ currentCard.category_emoji }}</span>
+            <span class="options-cat-name">{{ currentCard.category_name }}</span>
+            <span style="margin-left:auto;font-size:0.8rem;color:var(--muted);font-weight:700;">
+              DRAW THIS →
+            </span>
+          </div>
+          <div class="options-list">
+            <div
+              v-for="(item, idx) in currentCard.items"
+              :key="idx"
+              class="option-item"
+              :class="{ selected: diceValue === idx + 1 }"
+            >
+              <span class="option-num">{{ idx + 1 }}</span>
+              <span class="option-text">{{ item }}</span>
+              <span v-if="diceValue === idx + 1" style="margin-left:auto;font-size:1.2rem;">🎯</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dice + Timer row -->
+        <div class="dice-timer-row">
+
+          <!-- DICE -->
+          <div class="glass dice-panel">
+            <div class="dice-panel-title">🎲 &nbsp;Roll the Dice</div>
+            <div class="dice-face" :class="{ rolling: isDiceRolling }">
+              <div v-if="diceValue" class="dice-dots" :class="`dots-${diceValue}`">
+                <div v-for="n in diceValue" :key="n" class="dot"></div>
+              </div>
+              <span v-else class="dice-empty-hint">?</span>
+            </div>
+            <button
+              class="btn btn-gold"
+              style="width:100%"
+              :disabled="isDiceRolling || isTimerRunning"
+              @click="rollDice"
+            >
+              {{ isDiceRolling ? 'Rolling…' : diceValue ? '🔄 Re-roll' : '🎲 Roll!' }}
+            </button>
+          </div>
+
+          <!-- TIMER -->
+          <div class="glass timer-panel">
+            <div class="timer-panel-title">⏱ &nbsp;Timer</div>
+            <div class="timer-ring">
+              <svg class="timer-svg" viewBox="0 0 110 110">
+                <circle class="timer-bg-circle" cx="55" cy="55" r="46" />
+                <circle
+                  class="timer-progress-circle"
+                  cx="55" cy="55" r="46"
+                  :style="{
+                    strokeDasharray: timerCircumference,
+                    strokeDashoffset: timerDashoffset,
+                    stroke: timerColor
+                  }"
+                />
+              </svg>
+              <div class="timer-text">
+                <span class="timer-number" :class="{ critical: timer <= 10 }" :style="{ color: timerColor }">
+                  {{ timer }}
+                </span>
+              </div>
+            </div>
+            <button
+              class="btn btn-primary"
+              style="width:100%"
+              :disabled="!diceValue || isTimerRunning"
+              @click="startTimer"
+            >
+              {{ isTimerRunning ? '⏳ Running…' : '▶ Start Timer' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="actions-row">
+          <button class="btn btn-success" :disabled="!isTimerRunning && timer === maxTimer" @click="markCorrect">
+            ✅ &nbsp;Correct!
+          </button>
+          <button class="btn btn-ghost" @click="newCard">
+            🔀 &nbsp;New Card
+          </button>
+          <button class="btn btn-danger" @click="skipRound">
+            ⏭ &nbsp;Skip Turn
+          </button>
+        </div>
+
+      </div>
+    </transition>
+
+  </div>
+
+  <!-- ═══════════════ GUESSER PICKER (individual mode) ═══════════════ -->
+  <transition name="fade">
+    <div v-if="awaitingGuesser" class="celebration-overlay">
+      <div class="glass celebration-card">
+        <span class="celebration-icon">🙋</span>
+        <div class="celebration-title" style="color:var(--gold)">Who guessed it?</div>
+        <div class="celebration-message">
+          {{ currentParticipant.name }} was drawing — pick who shouted it out first.
+        </div>
+        <div class="guesser-grid">
+          <button
+            v-for="entry in otherParticipants"
+            :key="entry.idx"
+            type="button"
+            class="btn btn-ghost guesser-chip"
+            @click="selectGuesser(entry.idx)"
+          >{{ entry.name }}</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <!-- ═══════════════ CELEBRATION OVERLAY ═══════════════ -->
+  <transition name="fade">
+    <div v-if="showCelebration" class="celebration-overlay" @click="dismissCelebration">
+      <div class="glass celebration-card">
+        <span class="celebration-icon">{{ celebrationData.icon }}</span>
+        <div class="celebration-title" :class="celebrationData.type">
+          {{ celebrationData.title }}
+        </div>
+        <div class="celebration-message">{{ celebrationData.message }}</div>
+        <button class="btn btn-primary" @click.stop="dismissCelebration">
+          {{ celebrationData.btnText }}
+        </button>
+      </div>
+    </div>
+  </transition>
+
+  <!-- ═══════════════ CONFETTI ═══════════════ -->
+  <div class="confetti-container" v-if="showConfetti" aria-hidden="true">
+    <div
+      v-for="piece in confettiPieces"
+      :key="piece.id"
+      class="confetti-piece"
+      :style="piece.style"
+    ></div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
+
+// Color palette assigned to teams/players by index — extends the original
+// blue/pink duo so it scales to up to 6 teams or 5 individual players.
+const PALETTE = [
+  { c: '#4361ee', glow: 'rgba(67,97,238,0.4)' },
+  { c: '#f72585', glow: 'rgba(247,37,133,0.4)' },
+  { c: '#ffd60a', glow: 'rgba(255,214,10,0.4)' },
+  { c: '#06d6a0', glow: 'rgba(6,214,160,0.4)' },
+  { c: '#f97316', glow: 'rgba(249,115,22,0.4)' },
+  { c: '#a855f7', glow: 'rgba(168,85,247,0.4)' },
+];
+
+const MODE_LIMITS = {
+  teams:      { min: 2, max: 6 },
+  individual: { min: 3, max: 5 },
+};
+
+createApp({
+  setup() {
+    // ── State ─────────────────────────────────────
+    const phase          = ref('setup');
+
+    const mode           = ref('teams');
+    const setupNames     = ref(['', '']);
+
+    const onlineAvailable = ref(true);
+    const dataMode         = ref('online');
+
+    const participants   = ref([]);
+    const currentIdx     = ref(0);
+    const categories     = ref([]);
+    const currentCard    = ref(null);
+
+    const diceValue      = ref(null);
+    const isDiceRolling  = ref(false);
+
+    const maxTimer       = 60;
+    const timer          = ref(maxTimer);
+    const isTimerRunning = ref(false);
+    let   timerInterval  = null;
+
+    const showCelebration  = ref(false);
+    const celebrationData  = ref({});
+    const showConfetti     = ref(false);
+    const confettiPieces   = ref([]);
+    const scorePop          = ref([]);
+    const awaitingGuesser   = ref(false);
+
+    // ── Computed ──────────────────────────────────
+    const minParticipants = computed(() => MODE_LIMITS[mode.value].min);
+    const maxParticipants = computed(() => MODE_LIMITS[mode.value].max);
+
+    const currentParticipant = computed(() => participants.value[currentIdx.value]);
+
+    const otherParticipants = computed(() =>
+      participants.value
+        .map((p, idx) => ({ name: p.name, idx }))
+        .filter(entry => entry.idx !== currentIdx.value)
+    );
+
+    const nextTurnLabel = computed(() =>
+      mode.value === 'teams' ? "Next Team's Turn →" : "Next Player's Turn →"
+    );
+
+    function palette(idx) {
+      return PALETTE[idx % PALETTE.length];
+    }
+
+    const timerCircumference = 2 * Math.PI * 46;
+
+    const timerColor = computed(() => {
+      const r = timer.value / maxTimer;
+      if (r > 0.5) return '#06d6a0';
+      if (r > 0.25) return '#ffd166';
+      return '#ef476f';
+    });
+
+    const timerDashoffset = computed(() =>
+      timerCircumference * (1 - timer.value / maxTimer)
+    );
+
+    // ── API helpers ───────────────────────────────
+    async function fetchCategories() {
+      try {
+        const res  = await fetch('/api/categories');
+        const data = await res.json();
+        categories.value = data.categories;
+      } catch (e) {
+        console.error('Failed to fetch categories', e);
+      }
+    }
+
+    async function fetchConfig() {
+      try {
+        const res  = await fetch('/api/config');
+        const data = await res.json();
+        onlineAvailable.value = data.online_available;
+        if (!onlineAvailable.value) dataMode.value = 'offline';
+      } catch (e) {
+        console.error('Failed to fetch config', e);
+      }
+    }
+
+    // ── Setup actions ──────────────────────────────
+    function setMode(m) {
+      if (mode.value === m) return;
+      mode.value = m;
+      setupNames.value = Array.from({ length: MODE_LIMITS[m].min }, () => '');
+    }
+
+    function setDataMode(m) {
+      if (!onlineAvailable.value && m === 'online') return;
+      dataMode.value = m;
+    }
+
+    function addSetupName() {
+      if (setupNames.value.length >= maxParticipants.value) return;
+      setupNames.value.push('');
+    }
+
+    function removeSetupName(idx) {
+      if (setupNames.value.length <= minParticipants.value) return;
+      setupNames.value.splice(idx, 1);
+    }
+
+    // ── Game actions ──────────────────────────────
+    function startGame() {
+      const label = mode.value === 'teams' ? 'Team' : 'Player';
+      participants.value = setupNames.value.map((name, idx) => ({
+        name: name.trim() || `${label} ${idx + 1}`,
+        score: 0,
+      }));
+      scorePop.value = participants.value.map(() => false);
+      currentIdx.value = 0;
+      fetchCategories();
+      phase.value = 'category';
+    }
+
+    async function selectCategory(categoryId) {
+      try {
+        const res  = await fetch('/api/card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category_id: categoryId, mode: dataMode.value }),
+        });
+        const data = await res.json();
+        currentCard.value = data;
+        diceValue.value   = null;
+        timer.value       = maxTimer;
+        isTimerRunning.value = false;
+        if (timerInterval) clearInterval(timerInterval);
+        phase.value = 'card';
+      } catch (e) {
+        console.error('Failed to fetch card', e);
+      }
+    }
+
+    async function newCard() {
+      if (!currentCard.value) return;
+      stopTimer();
+      await selectCategory(currentCard.value.category_id);
+    }
+
+    function rollDice() {
+      if (isDiceRolling.value || isTimerRunning.value) return;
+      isDiceRolling.value = true;
+
+      const numOptions = currentCard.value ? currentCard.value.items.length : 4;
+      let count = 0;
+      const total = 15;
+
+      const interval = setInterval(() => {
+        diceValue.value = Math.floor(Math.random() * numOptions) + 1;
+        count++;
+        if (count >= total) {
+          clearInterval(interval);
+          isDiceRolling.value = false;
+        }
+      }, 80);
+    }
+
+    function startTimer() {
+      if (isTimerRunning.value || !diceValue.value) return;
+      isTimerRunning.value = true;
+
+      timerInterval = setInterval(() => {
+        timer.value--;
+        if (timer.value <= 0) {
+          stopTimer();
+          timeUp();
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      isTimerRunning.value = false;
+    }
+
+    function popScore(idx) {
+      scorePop.value[idx] = true;
+      setTimeout(() => { scorePop.value[idx] = false; }, 700);
+    }
+
+    function markCorrect() {
+      stopTimer();
+
+      if (mode.value === 'individual') {
+        // Individual games are too small to split into teams, so instead of
+        // scoring immediately we ask who guessed it — the drawer and the
+        // guesser each get a point.
+        awaitingGuesser.value = true;
+        return;
+      }
+
+      const team = currentParticipant.value;
+      team.score++;
+      popScore(currentIdx.value);
+
+      launchConfetti();
+      celebrationData.value = {
+        icon: '🎉',
+        type: 'correct',
+        title: 'Correct!',
+        message: `${team.name} scores a point! 🎨`,
+        btnText: nextTurnLabel.value,
+      };
+      showCelebration.value = true;
+    }
+
+    function selectGuesser(guesserIdx) {
+      awaitingGuesser.value = false;
+
+      const drawer  = participants.value[currentIdx.value];
+      const guesser = participants.value[guesserIdx];
+      drawer.score++;
+      guesser.score++;
+      popScore(currentIdx.value);
+      popScore(guesserIdx);
+
+      launchConfetti();
+      celebrationData.value = {
+        icon: '🎉',
+        type: 'correct',
+        title: 'Correct!',
+        message: `${drawer.name} & ${guesser.name} both score a point! 🎨`,
+        btnText: nextTurnLabel.value,
+      };
+      showCelebration.value = true;
+    }
+
+    function timeUp() {
+      celebrationData.value = {
+        icon: '⌛',
+        type: 'timeout',
+        title: "Time's Up!",
+        message: `No point this round. Better luck next time!`,
+        btnText: nextTurnLabel.value,
+      };
+      showCelebration.value = true;
+    }
+
+    function skipRound() {
+      stopTimer();
+      const nextIdx = (currentIdx.value + 1) % participants.value.length;
+      celebrationData.value = {
+        icon: '⏭',
+        type: 'timeout',
+        title: 'Turn Skipped',
+        message: `Switching to ${participants.value[nextIdx].name}.`,
+        btnText: nextTurnLabel.value,
+      };
+      showCelebration.value = true;
+    }
+
+    function dismissCelebration() {
+      showCelebration.value = false;
+      showConfetti.value    = false;
+      confettiPieces.value  = [];
+      nextTurn();
+    }
+
+    function nextTurn() {
+      currentIdx.value  = (currentIdx.value + 1) % participants.value.length;
+      currentCard.value = null;
+      diceValue.value   = null;
+      timer.value       = maxTimer;
+      phase.value       = 'category';
+    }
+
+    // ── Confetti ──────────────────────────────────
+    function launchConfetti() {
+      const colors = ['#4361ee','#f72585','#ffd60a','#06d6a0','#00f5d4','#f97316','#a855f7'];
+      confettiPieces.value = Array.from({ length: 60 }, (_, i) => ({
+        id: i,
+        style: {
+          left: Math.random() * 100 + 'vw',
+          background: colors[Math.floor(Math.random() * colors.length)],
+          width:  (Math.random() * 10 + 6) + 'px',
+          height: (Math.random() * 10 + 6) + 'px',
+          borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+          animationDuration: (Math.random() * 2 + 2) + 's',
+          animationDelay:    (Math.random() * 0.8) + 's',
+        },
+      }));
+      showConfetti.value = true;
+      setTimeout(() => { showConfetti.value = false; confettiPieces.value = []; }, 4000);
+    }
+
+    // ── Lifecycle ─────────────────────────────────
+    onMounted(() => { fetchConfig(); });
+    onUnmounted(() => { if (timerInterval) clearInterval(timerInterval); });
+
+    return {
+      phase,
+      onlineAvailable, dataMode, setDataMode,
+      mode, setupNames, minParticipants, maxParticipants,
+      participants, currentIdx, currentParticipant, otherParticipants,
+      categories, currentCard,
+      diceValue, isDiceRolling,
+      timer, maxTimer, isTimerRunning,
+      timerColor, timerDashoffset, timerCircumference,
+      showCelebration, celebrationData,
+      showConfetti, confettiPieces,
+      scorePop, awaitingGuesser,
+      palette,
+      setMode, addSetupName, removeSetupName,
+      startGame, selectCategory, newCard,
+      rollDice, startTimer, markCorrect, selectGuesser, skipRound, dismissCelebration,
+    };
+  },
+}).mount('#app');
+</script>
+</body>
+</html>

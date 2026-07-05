@@ -8,7 +8,7 @@ install before running it.
 
 Usage:
     python3 hub.py [--port 4000] [--mafia-port 3000] [--charades-port 8080] \
-        [--guess-the-personality-port 8081]
+        [--guess-the-personality-port 8081] [--pictionary-port 9090]
 """
 
 import argparse
@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 TEMPLATES_DIR = Path(__file__).parent / "www" / "templates"
 
 
-def build_games(mafia_port: int, charades_port: int, guess_the_personality_port: int) -> list[dict]:
+def build_games(mafia_port: int, charades_port: int, guess_the_personality_port: int, pictionary_port: int) -> list[dict]:
     return [
         {
             "name": "Mafia",
@@ -43,6 +43,13 @@ def build_games(mafia_port: int, charades_port: int, guess_the_personality_port:
             "url": f"http://localhost:{guess_the_personality_port}",
             "path": "games/guess-the-personality",
             "start": "cd games/guess-the-personality && make run",
+        },
+        {
+            "name": "Pictionary",
+            "description": "Draw-and-guess party game, online AI clues or offline word bank.",
+            "url": f"http://localhost:{pictionary_port}",
+            "path": "games/pictionary",
+            "start": "cd games/pictionary && make run",
         },
     ]
 
@@ -113,10 +120,13 @@ def main() -> None:
         default=8081,
         help="port Guess the Personality runs on",
     )
+    parser.add_argument("--pictionary-port", type=int, default=9090, help="port Pictionary runs on")
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), Handler)
-    server.games = build_games(args.mafia_port, args.charades_port, args.guess_the_personality_port)
+    server.games = build_games(
+        args.mafia_port, args.charades_port, args.guess_the_personality_port, args.pictionary_port
+    )
     print(f"Revelry games hub running at http://localhost:{args.port}")
     try:
         server.serve_forever()
