@@ -41,6 +41,7 @@ coverage/
 *.db
 *.sqlite3
 !games/bollywood-dumbcharades/data/movies.db
+!games/pictionary/data/categories.db
 
 # Build outputs
 build/
