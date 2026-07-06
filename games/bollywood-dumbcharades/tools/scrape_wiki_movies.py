@@ -15,6 +15,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 import anthropic
 import requests
@@ -48,22 +49,35 @@ Each object must have exactly these fields:
 - genres (array of lowercase strings): e.g. ["action", "drama"]
 - language (string): "Hindi" for Hindi-original films, or the original \
 language (e.g. "Telugu") for pan-India hits widely watched in Hindi-dub
-- difficulty (string): "easy" | "medium" | "hard" — how hard the title is \
-to guess once mimed
-- dumb_charades_ready (bool): true ONLY if the title is genuinely mimeable
+- difficulty (string): "easy" | "medium" | "hard" | "ultra_hard" — how hard \
+the title is to guess once mimed
+- dumb_charades_ready (bool): true if there is any concrete mimeable \
+anchor at all; false only for a title where no gesture is possible \
+whatsoever (rare)
 - mime_hint (string or null): one short phrase suggesting how to act it \
 out, required whenever dumb_charades_ready is true, otherwise null
+- min_mime_seconds (int or null): minimum seconds realistically needed to \
+mime this out — REQUIRED (non-null) when difficulty is "hard" or \
+"ultra_hard", otherwise null
 - tags (array of lowercase strings): free-form flavor tags (actor, \
 franchise, era, cult status)
 - franchise (string or null): franchise/series name if part of one
+- hindi_title (string): a natural Hindi rendering of the title in \
+Devanagari script
 
-Mimeability criteria for dumb_charades_ready = true:
-1. SHORT OR ICONIC — a title/phrase a mimer can gesture in under a minute.
-2. CONCRETE — has a recognizable object, action, character, or scene \
-rather than being purely abstract wordplay.
-3. RECOGNIZABLE — a mimed gesture would plausibly let a teammate guess it.
-4. If you don't recognize a title, make a reasonable guess from the words \
-in it and default dumb_charades_ready to false when unsure.
+Mimeability criteria:
+1. LENGTH DOESN'T MATTER — long or multi-word titles are fine; there's no \
+"short/iconic" requirement.
+2. CONCRETE — prefer a recognizable object, action, character, or scene \
+over pure abstract wordplay; this affects difficulty, not inclusion.
+3. RECOGNIZABLE — a mimed gesture should plausibly let a teammate guess \
+it, eventually.
+4. ULTRA_HARD — assign this tier (with a min_mime_seconds estimate) to \
+titles that are long, abstract, wordplay-heavy, or otherwise take real \
+effort/time to convey through mime. This replaces what used to be \
+dumb_charades_ready = false.
+5. If you don't recognize a title, make a reasonable guess from the words \
+in it.
 
 Output ONLY a JSON array of movie objects, nothing else — no markdown \
 fences, no prose, no commentary."""
@@ -87,6 +101,61 @@ def is_release_table(headers: list[str]) -> bool:
     return has_title and has_credit_column
 
 
+def expand_header_row(header_row) -> list[str]:
+    """Expand a header <tr> into one lowercase name per physical column.
+
+    A header cell's `colspan` (e.g. a merged "Opening" header covering
+    separate Month/Day sub-columns) makes the header count undercount the
+    real column count if left un-expanded, which throws off every row's
+    column alignment below it.
+    """
+    headers: list[str] = []
+    for cell in header_row.find_all(["th", "td"]):
+        colspan = int(cell.get("colspan", 1) or 1)
+        headers.extend([cell.get_text(strip=True).lower()] * colspan)
+    return headers
+
+
+def build_row_grid(row, num_cols: int, pending: dict) -> list[Optional[str]]:
+    """Reconstruct one data row into a `num_cols`-wide grid of cell text.
+
+    Cells carried down by a `rowspan` from an earlier row are re-inserted at
+    their original column via `pending` (column index -> (text, rows left)),
+    so a row missing a leading grouped column (e.g. a rowspan'd release
+    month/quarter) still lines up under the right header. Any of the row's
+    own cells beyond `num_cols` (stray/malformed trailing cells) are simply
+    not placed anywhere, rather than shifting real columns out of position.
+    """
+    grid: list[Optional[str]] = [None] * num_cols
+    cells = iter(row.find_all(["td", "th"]))
+    current = next(cells, None)
+    col = 0
+    while col < num_cols:
+        if col in pending:
+            text, remaining = pending[col]
+            grid[col] = text
+            if remaining > 1:
+                pending[col] = (text, remaining - 1)
+            else:
+                del pending[col]
+            col += 1
+            continue
+        if current is None:
+            break
+        text = current.get_text(strip=True)
+        rowspan = int(current.get("rowspan", 1) or 1)
+        colspan = int(current.get("colspan", 1) or 1)
+        for c in range(colspan):
+            if col + c >= num_cols:
+                break
+            grid[col + c] = text
+            if rowspan > 1:
+                pending[col + c] = (text, rowspan - 1)
+        col += colspan
+        current = next(cells, None)
+    return grid
+
+
 def extract_titles(html: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
     titles: list[str] = []
@@ -96,22 +165,21 @@ def extract_titles(html: str) -> list[str]:
         rows = table.find_all("tr")
         if not rows:
             continue
-        headers = [h.get_text(strip=True).lower() for h in rows[0].find_all(["th", "td"])]
+        headers = expand_header_row(rows[0])
         if not is_release_table(headers):
             continue
         title_idx = next((i for i, h in enumerate(headers) if "title" in h or h == "film"), None)
         if title_idx is None:
             continue
 
+        pending: dict = {}
         for row in rows[1:]:
-            cells = row.find_all(["td", "th"])
-            if not cells:
+            if not row.find_all(["td", "th"]):
                 continue
-            offset = len(headers) - len(cells)
-            idx = title_idx - offset
-            if not (0 <= idx < len(cells)):
+            grid = build_row_grid(row, len(headers), pending)
+            if grid[title_idx] is None:
                 continue
-            title = clean_title(cells[idx].get_text(strip=True))
+            title = clean_title(grid[title_idx])
             if title.lower() in JUNK_TITLES or title.lower() in seen_lower:
                 continue
             seen_lower.add(title.lower())

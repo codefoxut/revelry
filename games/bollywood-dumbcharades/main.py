@@ -20,8 +20,6 @@ app = FastAPI(title="Bollywood Dumb Charades")
 SESSIONS_DIR = Path("sessions")
 SESSIONS_DIR.mkdir(exist_ok=True)
 
-MOVIE_POOL_SIZE = 30
-WIN_SCORE = 10
 MIN_TEAMS = 2
 MAX_TEAMS = 8
 MIN_PLAYERS = 3
@@ -32,10 +30,11 @@ MOVIE_JSON_SCHEMA = {
     "properties": {
         "title": {"type": "string"},
         "year": {"type": "integer"},
-        "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
+        "difficulty": {"type": "string", "enum": ["easy", "medium", "hard", "ultra_hard"]},
         "mime_hint": {"type": "string"},
+        "min_mime_seconds": {"type": ["integer", "null"]},
     },
-    "required": ["title", "year", "difficulty", "mime_hint"],
+    "required": ["title", "year", "difficulty", "mime_hint", "min_mime_seconds"],
     "additionalProperties": False,
 }
 
@@ -45,7 +44,7 @@ def online_mode_available() -> bool:
 
 
 def generate_online_movie(used_titles: List[str]) -> dict:
-    """Ask Claude for one dumb-charades-ready Bollywood movie, live.
+    """Ask Claude for one Bollywood movie to mime, live.
 
     Used only in online mode, as an alternative to sampling data/movies.db.
     """
@@ -61,9 +60,12 @@ def generate_online_movie(used_titles: List[str]) -> dict:
         messages=[{
             "role": "user",
             "content": (
-                "Suggest one real Bollywood movie for a game of dumb charades. "
-                "It must be short/iconic enough to mime in under a minute, have "
-                "a concrete recognizable object/action/scene, and be well known. "
+                "Suggest one real, well-known Bollywood movie for a game of dumb "
+                "charades. Title length doesn't matter. Rate difficulty as "
+                "easy/medium/hard/ultra_hard based on how concrete and "
+                "recognizable it is once mimed. For hard or ultra_hard, also give "
+                "min_mime_seconds (minimum seconds realistically needed to mime "
+                "it out); otherwise min_mime_seconds must be null. "
                 f"Do not suggest any of these already-used titles: {avoid}."
             ),
         }],
@@ -76,26 +78,28 @@ def generate_online_movie(used_titles: List[str]) -> dict:
         "year": data["year"],
         "difficulty": data["difficulty"],
         "mime_hint": data["mime_hint"],
+        "min_mime_seconds": data["min_mime_seconds"],
     }
 
 
-def sample_movie_pool(limit: int = MOVIE_POOL_SIZE) -> List[dict]:
-    """Pick a shuffled set of mimeable movies for one game session.
+def pick_offline_movie(used_titles: List[str]) -> Optional[dict]:
+    """Draw one random not-yet-used movie from data/movies.db.
 
-    Sampled once at session start so the pool stays stable for the whole game.
+    Called fresh on every /reveal (not pre-sampled at session start) so a
+    session can run indefinitely without running out of a fixed-size pool.
     """
-    ready = movie_db.ready_movies()
-    chosen = random.sample(ready, min(limit, len(ready)))
-    return [
-        {
-            "id": m["id"],
-            "title": m["title"],
-            "year": m["year"],
-            "difficulty": m["difficulty"],
-            "mime_hint": m["mime_hint"],
-        }
-        for m in chosen
-    ]
+    available = [m for m in movie_db.all_movies() if m["title"] not in used_titles]
+    if not available:
+        return None
+    m = random.choice(available)
+    return {
+        "id": m["id"],
+        "title": m["title"],
+        "year": m["year"],
+        "difficulty": m["difficulty"],
+        "mime_hint": m["mime_hint"],
+        "min_mime_seconds": m["min_mime_seconds"],
+    }
 
 
 # ── Session helpers ──────────────────────────────────────────────────────────
@@ -130,25 +134,14 @@ def new_state(participant_names: List[str], mode: str, movie_source: str) -> dic
         "teams": teams,
         "scores": {t["id"]: 0 for t in teams},
         "turn_index": 0,
-        "pool": sample_movie_pool() if movie_source == "offline" else [],
         "used_titles": [],
         "current": None,
         "pending_steal": False,
-        "status": "playing",
-        "winner": None,
     }
 
 
 def next_turn_index(state: dict) -> int:
     return (state["turn_index"] + 1) % len(state["teams"])
-
-
-def apply_win_check(state: dict) -> None:
-    for team in state["teams"]:
-        if state["scores"][team["id"]] >= WIN_SCORE:
-            state["status"] = "finished"
-            state["winner"] = team["id"]
-            return
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
@@ -208,25 +201,25 @@ async def reveal_movie(session_id: str):
     state = load_session(session_id)
     if state is None:
         raise HTTPException(status_code=404, detail="No session found")
-    if state["status"] != "playing":
-        raise HTTPException(status_code=400, detail="Game already finished")
     if state["current"] is not None:
         raise HTTPException(status_code=400, detail="A movie is already revealed")
 
+    used_titles = state.setdefault("used_titles", [])
     if state.get("movie_source", "offline") == "online":
         try:
-            movie = generate_online_movie(state.get("used_titles", []))
+            movie = generate_online_movie(used_titles)
         except Exception:
             raise HTTPException(
                 status_code=502,
                 detail="Could not reach Claude to pick a movie. Try again.",
             )
-        state["current"] = movie
-        state.setdefault("used_titles", []).append(movie["title"])
     else:
-        if not state["pool"]:
-            raise HTTPException(status_code=400, detail="No movies left in the pool")
-        state["current"] = state["pool"].pop(0)
+        movie = pick_offline_movie(used_titles)
+        if movie is None:
+            raise HTTPException(status_code=400, detail="No movies left to pick from")
+
+    state["current"] = movie
+    used_titles.append(movie["title"])
 
     save_session(session_id, state)
     return state
@@ -289,7 +282,6 @@ async def resolve_round(session_id: str, req: ResolveRequest):
     else:
         raise HTTPException(status_code=400, detail="Unknown result")
 
-    apply_win_check(state)
     save_session(session_id, state)
     return state
 

@@ -32,14 +32,10 @@ players' phones must go through the server.
                                                           // same shape either way
   "scores": { "t0": 0, "t1": 1, ... },
   "turn_index": 0,               // index into `teams` of whoever is up
-  "pool": [ {id, title, year, difficulty, mime_hint}, ... ],  // remaining movies
-                                                               // (offline mode only — always [] in online mode)
-  "used_titles": ["Sholay", ...],  // titles already suggested this session —
-                                    // only populated/consumed in online mode
+  "used_titles": ["Sholay", ...],  // titles already revealed this session,
+                                    // in both modes — keeps /reveal from repeating
   "current": { ... } | null,     // the currently revealed movie, or null
-  "pending_steal": false,        // teams mode only — see below
-  "status": "playing" | "finished",
-  "winner": "t1" | null          // team/player id once status is "finished"
+  "pending_steal": false         // teams mode only — see below
 }
 ```
 
@@ -82,22 +78,26 @@ interesting case is a correct guess:
   the same request. This is the whole point of the mode: two people
   score per correct round instead of one.
 
-Both modes share `turn_index` rotation, `WIN_SCORE = 10` win-checking,
-and the same movie pool/reveal flow — only the resolve-endpoint branch
-and the setup-screen bounds differ. See `MODE_LIMITS` in
-`static/index.html` and the `mode ==` branches in `resolve_round()` in
-`main.py` if you need to adjust bounds or add a third mode.
+Both modes share `turn_index` rotation and the same movie pool/reveal
+flow — only the resolve-endpoint branch and the setup-screen bounds
+differ. See `MODE_LIMITS` in `static/index.html` and the `mode ==`
+branches in `resolve_round()` in `main.py` if you need to adjust bounds
+or add a third mode.
+
+Scoring has no cap — the game keeps going, round after round, until
+the players end it themselves via "New Game." There's no win condition
+to check or "finished" state to gate on.
 
 ## Movie source: offline vs online
 
 Chosen at game start alongside `mode`, via `movie_source` on the `/start`
 request (`"offline"` default, or `"online"`). This is a parallel toggle to
 teams/individual — see [`MOVIE_DATABASE.md`](MOVIE_DATABASE.md) for full
-detail on both paths. In short: offline samples `pool` from
-`data/movies.db` once at start and `/reveal` pops from it (deterministic, no
-LLM calls); online skips the pool entirely and `/reveal` calls Claude live
-each time via `generate_online_movie()`, tracking `used_titles` in session
-state so it doesn't repeat itself.
+detail on both paths. In short: both modes draw one movie per `/reveal`
+call, not upfront — offline picks a random unused entry from
+`data/movies.db` (`pick_offline_movie()`, no LLM calls); online calls
+Claude live via `generate_online_movie()`. Both track `used_titles` in
+session state so a title doesn't repeat within the same session.
 
 Online mode is only ever offered if `ANTHROPIC_API_KEY` is configured —
 `GET /config` reports `online_mode_available`, and the frontend doesn't
@@ -142,6 +142,19 @@ template-string `innerHTML`. Key entry points if you're extending this:
 - `currentMode` and `lastTeamNames` persist across reloads via
   `localStorage` (`dc_mode`, `dc_team_names`); `sessionId` similarly via
   `dc_session_id` so an in-progress game survives a refresh.
+- The mime timer is entirely client-side (no server state). `baseDurationSeconds`
+  is the player-configured default (the "Set" control); `totalSeconds` is
+  the *effective* duration for the current round, which `applyRoundDuration(movie)`
+  bumps up to `movie.min_mime_seconds` whenever a revealed title needs more
+  time than the default (see `MOVIE_DATABASE.md`'s difficulty/`min_mime_seconds`
+  fields) — the movie card shows a "⏱ Extra time granted" note when this
+  happens. `applyRoundDuration` replaces plain `resetTimer()` calls
+  everywhere a fresh/updated `state.current` is available (`revealMovie`,
+  `resolve`, `startWithTeams`, session restore on load); `resetTimer()`
+  itself is only for the manual ↺ button, which restarts the *current*
+  round's duration rather than recomputing it.
+- The movie card also renders `m.hindi_title` (Devanagari) under the
+  English title when present — see `.card-hindi-title` for the font stack.
 
 ## Local dev
 

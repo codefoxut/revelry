@@ -36,23 +36,34 @@ Each entry must be a JSON object with exactly these fields:
 - genres (array of lowercase strings): e.g. ["action", "drama"]
 - language (string): "Hindi" for Hindi-original films, or the original \
 language (e.g. "Telugu") for pan-India hits widely watched in Hindi-dub
-- difficulty (string): "easy" | "medium" | "hard" — how hard the title is \
-to guess once mimed
-- dumb_charades_ready (bool): true ONLY if the title is genuinely mimeable
+- difficulty (string): "easy" | "medium" | "hard" | "ultra_hard" — how hard \
+the title is to guess once mimed
+- dumb_charades_ready (bool): true if there is any concrete mimeable \
+anchor at all; false only for a title where no gesture is possible \
+whatsoever (rare)
 - mime_hint (string or null): one short phrase suggesting how to act it \
 out, required whenever dumb_charades_ready is true, otherwise null
+- min_mime_seconds (int or null): minimum seconds realistically needed to \
+mime this out — REQUIRED (non-null) when difficulty is "hard" or \
+"ultra_hard", otherwise null
 - tags (array of lowercase strings): free-form flavor tags (actor, \
 franchise, era, cult status)
 - franchise (string or null): franchise/series name if part of one
+- hindi_title (string): a natural Hindi rendering of the title in \
+Devanagari script
 
-Mimeability criteria for dumb_charades_ready = true:
-1. SHORT OR ICONIC — a title/phrase a mimer can gesture in under a minute.
-2. CONCRETE — has a recognizable object, action, character, or scene \
-(a sword, a wrestling move, a moon, a train) rather than being purely \
-abstract wordplay.
-3. RECOGNIZABLE — a mimed gesture would plausibly let a teammate guess it.
-4. Mark dumb_charades_ready = false for titles that are abstract phrases, \
-idioms, or feelings with no concrete gesture (e.g. "Kuch Kuch Hota Hai").
+Mimeability criteria:
+1. LENGTH DOESN'T MATTER — long or multi-word titles are fine; there's no \
+"short/iconic" requirement.
+2. CONCRETE — prefer a recognizable object, action, character, or scene \
+(a sword, a wrestling move, a moon, a train) over pure abstract wordplay; \
+this affects difficulty, not inclusion.
+3. RECOGNIZABLE — a mimed gesture should plausibly let a teammate guess \
+it, eventually.
+4. ULTRA_HARD — assign this tier (with a min_mime_seconds estimate) to \
+titles that are long, abstract, wordplay-heavy, or otherwise take real \
+effort/time to convey through mime (e.g. "Kuch Kuch Hota Hai"). This \
+replaces what used to be dumb_charades_ready = false.
 
 Output ONLY a JSON array of movie objects, nothing else — no markdown \
 fences, no prose, no commentary."""

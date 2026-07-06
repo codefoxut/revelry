@@ -3,7 +3,7 @@ PYTHON := $(VENV)/bin/python
 UV     := $(VENV)/bin/uvicorn
 PORT   := 8080
 
-.PHONY: setup install run scrape update-movies bulk-fill clean
+.PHONY: setup install run scrape scrape-imdb update-movies bulk-fill backfill-hindi backfill-mime-time clean
 
 setup: $(VENV)/bin/activate
 
@@ -25,6 +25,9 @@ scrape: install
 	@test -n "$(YEAR)" || (echo "❌ Usage: make scrape YEAR=2023 [ARGS=\"--limit 15 --dry-run\"]"; exit 1)
 	$(PYTHON) tools/scrape_wiki_movies.py --year $(YEAR) $(ARGS)
 
+scrape-imdb: install
+	$(PYTHON) tools/scrape_imdb_movies.py $(ARGS)
+
 update-movies: install
 	$(PYTHON) tools/update_movies.py $(ARGS)
 
@@ -32,6 +35,12 @@ bulk-fill: install
 	@test -n "$(START)" || (echo "❌ Usage: make bulk-fill START=1927 END=2026 [ARGS=\"--skip-existing 15 --dry-run\"]"; exit 1)
 	@test -n "$(END)" || (echo "❌ Usage: make bulk-fill START=1927 END=2026 [ARGS=\"--skip-existing 15 --dry-run\"]"; exit 1)
 	$(PYTHON) tools/bulk_fill_movies.py --start $(START) --end $(END) $(ARGS)
+
+backfill-hindi: install
+	$(PYTHON) tools/backfill_hindi_titles.py $(ARGS)
+
+backfill-mime-time: install
+	$(PYTHON) tools/backfill_min_mime_seconds.py $(ARGS)
 
 clean:
 	rm -rf $(VENV) __pycache__ static/__pycache__ tools/__pycache__

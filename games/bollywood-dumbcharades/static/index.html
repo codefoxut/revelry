@@ -392,9 +392,10 @@
       border-radius: 20px;
       font-weight: 700;
     }
-    .card-difficulty.diff-easy   { background: rgba(76, 175, 80, 0.2); color: #7ee08a; border: 1px solid rgba(76,175,80,0.5); }
-    .card-difficulty.diff-medium { background: rgba(255, 153, 51, 0.2); color: var(--saffron); border: 1px solid rgba(255,153,51,0.5); }
-    .card-difficulty.diff-hard   { background: rgba(193, 32, 58, 0.25); color: #ff8fa3; border: 1px solid rgba(193,32,58,0.5); }
+    .card-difficulty.diff-easy       { background: rgba(76, 175, 80, 0.2); color: #7ee08a; border: 1px solid rgba(76,175,80,0.5); }
+    .card-difficulty.diff-medium     { background: rgba(255, 153, 51, 0.2); color: var(--saffron); border: 1px solid rgba(255,153,51,0.5); }
+    .card-difficulty.diff-hard       { background: rgba(193, 32, 58, 0.25); color: #ff8fa3; border: 1px solid rgba(193,32,58,0.5); }
+    .card-difficulty.diff-ultra_hard { background: rgba(80, 0, 20, 0.4); color: #ff5470; border: 1px solid rgba(139,0,32,0.7); }
 
     .card-title {
       font-size: clamp(1.4rem, 5vw, 2rem);
@@ -402,6 +403,13 @@
       color: var(--gold);
       text-shadow: 0 0 16px rgba(245, 200, 66, 0.5);
       line-height: 1.25;
+    }
+    .card-hindi-title {
+      font-family: "Noto Sans Devanagari", "Nirmala UI", "Kohinoor Devanagari", "Palatino Linotype", serif;
+      font-size: clamp(1.1rem, 4vw, 1.4rem);
+      color: var(--pale-gold);
+      opacity: 0.85;
+      margin-top: -6px;
     }
     .card-year { font-size: 0.85rem; color: var(--saffron); opacity: 0.8; }
     .card-hint {
@@ -414,9 +422,15 @@
       border-top: 1px dashed rgba(245, 200, 66, 0.25);
       width: 100%;
     }
+    .card-extra-time {
+      font-size: 0.7rem;
+      letter-spacing: 0.5px;
+      color: var(--saffron);
+      opacity: 0.85;
+    }
 
-    .steal-icon, .trophy { font-size: 3rem; }
-    .steal-text, .winner-text {
+    .steal-icon { font-size: 3rem; }
+    .steal-text {
       font-size: clamp(1.1rem, 4vw, 1.5rem);
       font-weight: 700;
       color: var(--gold);
@@ -451,9 +465,6 @@
     .correct-btn:hover { box-shadow: 0 0 18px rgba(76, 175, 80, 0.5); transform: translateY(-1px); }
     .pass-btn { background: linear-gradient(135deg, var(--crimson) 0%, #8B0020 100%); color: var(--pale-gold); }
     .pass-btn:hover { box-shadow: 0 0 18px rgba(255, 153, 51, 0.5); transform: translateY(-1px); }
-    .play-again-btn { background: linear-gradient(135deg, var(--gold) 0%, var(--deep-saffron) 100%); color: #1c0008; }
-    .play-again-btn:hover { box-shadow: 0 0 20px rgba(245, 200, 66, 0.5); transform: translateY(-1px); }
-
     .actions.picker-actions { flex-wrap: wrap; justify-content: center; max-width: 480px; }
     .guesser-btn {
       flex: 0 1 130px;
@@ -789,7 +800,9 @@
   ══════════════════════════════════════════════════ */
   const CIRCUMFERENCE = 2 * Math.PI * 22; // 138.2
 
-  let totalSeconds   = 90;
+  let baseDurationSeconds = 90; // user's preferred duration, set via the "Set" control
+  let totalSeconds   = 90;      // this round's effective duration — >= baseDurationSeconds
+                                 // when the revealed movie's min_mime_seconds needs more time
   let remaining      = 90;
   let timerRunning   = false;
   let timerInterval  = null;
@@ -864,6 +877,7 @@
       renderTimer();
     } else {
       // Start
+      getAudioCtx();
       timerRunning = true;
       startPauseEl.textContent = '⏸';
       startPauseEl.classList.add('active');
@@ -894,6 +908,40 @@
     document.body.style.transition = 'background-color 0.15s';
     document.body.style.backgroundColor = '#3d0010';
     setTimeout(() => { document.body.style.backgroundColor = ''; }, 300);
+    playTimesUpTone();
+  }
+
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  // Buzzer-style alarm marking the end of the round — repeats for ~5s.
+  function playTimesUpTone() {
+    const ctx = getAudioCtx();
+    const now = ctx.currentTime;
+    const totalDuration = 5;
+    const beepLen = 0.25;
+    const gap = 0.15;
+    const period = beepLen + gap;
+    const count = Math.floor(totalDuration / period);
+
+    for (let i = 0; i < count; i++) {
+      const delay = i * period;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = i % 2 === 0 ? 440 : 330;
+      gain.gain.setValueAtTime(0, now + delay);
+      gain.gain.linearRampToValueAtTime(0.25, now + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + beepLen);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + delay);
+      osc.stop(now + delay + beepLen + 0.02);
+    }
   }
 
   function resetTimer() {
@@ -910,12 +958,28 @@
     const inp = document.getElementById('durationInput');
     const val = Math.max(10, Math.min(300, parseInt(inp.value) || 90));
     inp.value = val;
+    baseDurationSeconds = val;
     totalSeconds = val;
     remaining = val;
     stopInterval();
     timerRunning = false;
     startPauseEl.textContent = '▶';
     startPauseEl.classList.remove('active');
+    renderTimer();
+  }
+
+  // Resets the round timer to baseDurationSeconds, unless the revealed
+  // movie's min_mime_seconds needs more — some titles (hard/ultra_hard)
+  // realistically can't be mimed in the player's default duration.
+  function applyRoundDuration(movie) {
+    const needed = (movie && movie.min_mime_seconds) ? movie.min_mime_seconds : 0;
+    totalSeconds = Math.max(baseDurationSeconds, needed);
+    remaining = totalSeconds;
+    stopInterval();
+    timerRunning = false;
+    startPauseEl.textContent = '▶';
+    startPauseEl.classList.remove('active');
+    circleWrap.classList.remove('timesup');
     renderTimer();
   }
 
@@ -1037,20 +1101,6 @@
     scoreEl.textContent = state.teams.map(t => `${t.name}: ${state.scores[t.id]}`).join(' | ');
     scoreEl.classList.remove('hidden');
 
-    if (state.status === 'finished') {
-      const winnerTeam = state.teams.find(t => t.id === state.winner);
-      bannerEl.classList.add('hidden');
-      stageEl.innerHTML = `
-        <div class="movie-card">
-          <div class="trophy">🏆</div>
-          <div class="winner-text">${escapeHtml(winnerTeam ? winnerTeam.name : '')} wins!</div>
-        </div>`;
-      actionsEl.innerHTML = `<button class="result-btn play-again-btn" onclick="newGame()">🎉 Play Again</button>`;
-      stopInterval();
-      timerRunning = false;
-      return;
-    }
-
     bannerEl.classList.remove('hidden');
     const n = state.teams.length;
     const currentTeam = state.teams[state.turn_index];
@@ -1073,11 +1123,14 @@
 
     if (state.current) {
       const m = state.current;
+      const extraTime = m.min_mime_seconds && m.min_mime_seconds > baseDurationSeconds;
       stageEl.innerHTML = `
         <div class="movie-card">
           <div class="card-difficulty diff-${escapeHtml(m.difficulty)}">${escapeHtml(m.difficulty)}</div>
           <div class="card-title">${escapeHtml(m.title)}</div>
+          ${m.hindi_title ? `<div class="card-hindi-title">${escapeHtml(m.hindi_title)}</div>` : ''}
           <div class="card-year">(${m.year})</div>
+          ${extraTime ? `<div class="card-extra-time">⏱ Extra time granted — ${fmtTime(m.min_mime_seconds)} for this one</div>` : ''}
           ${m.mime_hint ? `<div class="card-hint">💡 ${escapeHtml(m.mime_hint)}</div>` : ''}
         </div>`;
       if (state.mode === 'individual') {
@@ -1121,7 +1174,7 @@
     return withBusy(async () => {
       const state = await fetchJson(`/reveal/${sessionId}`, { method: 'POST' });
       renderState(state);
-      resetTimer();
+      applyRoundDuration(state.current);
       startTimer();
     });
   }
@@ -1136,7 +1189,7 @@
         body: JSON.stringify(body)
       });
       renderState(state);
-      resetTimer();
+      applyRoundDuration(state.current);
     });
   }
 
@@ -1197,7 +1250,7 @@
       });
       hideModal();
       renderState(state);
-      resetTimer();
+      applyRoundDuration(state.current);
     } catch (e) {
       alert(e.message || 'Could not start the game. Check the server.');
     } finally {
@@ -1221,7 +1274,7 @@
     actionsEl.classList.remove('picker-actions');
     actionsEl.innerHTML = '';
     document.getElementById('scoreBadge').classList.add('hidden');
-    resetTimer();
+    applyRoundDuration(null);
     showModal();
   }
 
@@ -1236,6 +1289,7 @@
     try {
       const state = await fetchJson(`/state/${sessionId}`);
       renderState(state);
+      applyRoundDuration(state.current);
       hideModal();
     } catch {
       showModal();
