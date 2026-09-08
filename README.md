@@ -40,7 +40,8 @@ Modern party games for friends, families, and teams.
 ✅ Guess the Personality
 ✅ Emoji Charades
 ✅ Name That Tune
-⬜ Codenames
+✅ Spyfall
+✅ Codenames
 ⬜ Would You Rather
 ⬜ Trivia
 ⬜ Two Truths and a Lie
@@ -162,3 +163,36 @@ make install && make run
 ```
 
 Open http://localhost:8084.
+
+### [Spyfall](games/spyfall/README.md)
+
+Real-time multiplayer social deduction — everyone but one secret spy shares a location
+and role; discuss, then vote out the spy (or the spy guesses the location to win).
+
+From the repo root: `make spyfall`. Or directly:
+
+```bash
+cd games/spyfall
+make install && make dev
+```
+
+Open http://localhost:3100 (backend runs on http://localhost:8100). See the
+[game's README](games/spyfall/README.md) for the Docker-based alternative and full command
+list.
+
+### [Codenames](games/codenames/README.md)
+
+Real-time multiplayer word game — two teams, each with a secret spymaster, race to find
+all of their words on a shared 25-word board using one-word clues, while avoiding the
+assassin card.
+
+From the repo root: `make codenames`. Or directly:
+
+```bash
+cd games/codenames
+make install && make dev
+```
+
+Open http://localhost:3200 (backend runs on http://localhost:8200). See the
+[game's README](games/codenames/README.md) for the Docker-based alternative and full
+command list.

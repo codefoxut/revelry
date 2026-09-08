@@ -1,0 +1,58 @@
+version: 2
+updates:
+  # --- pip (requirements.txt) ---
+  - package-ecosystem: "pip"
+    directory: "/games/bollywood-dumbcharades"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/games/codenames/backend"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/games/emoji-charades"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/games/guess-the-personality"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/games/heads-up"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/games/mafia/backend"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/games/name-that-tune"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/games/pictionary"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/games/spyfall/backend"
+    schedule:
+      interval: "weekly"
+
+  # --- npm (package.json) ---
+  - package-ecosystem: "npm"
+    directory: "/games/mafia/frontend"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "npm"
+    directory: "/games/spyfall/frontend"
+    schedule:
+      interval: "weekly"

@@ -10,7 +10,7 @@ Usage:
     python3 hub.py [--port 4000] [--mafia-port 3000] [--charades-port 8080] \
         [--guess-the-personality-port 8081] [--pictionary-port 9090] \
         [--heads-up-port 8082] [--emoji-charades-port 8083] \
-        [--name-that-tune-port 8084]
+        [--name-that-tune-port 8084] [--spyfall-port 3100] [--codenames-port 3200]
 """
 
 import argparse
@@ -31,6 +31,8 @@ def build_games(
     heads_up_port: int,
     emoji_charades_port: int,
     name_that_tune_port: int,
+    spyfall_port: int,
+    codenames_port: int,
 ) -> list[dict]:
     return [
         {
@@ -81,6 +83,20 @@ def build_games(
             "url": f"http://localhost:{name_that_tune_port}",
             "path": "games/name-that-tune",
             "start": "cd games/name-that-tune && make run",
+        },
+        {
+            "name": "Spyfall",
+            "description": "Real-time multiplayer social deduction — find the spy, or be the spy.",
+            "url": f"http://localhost:{spyfall_port}",
+            "path": "games/spyfall",
+            "start": "cd games/spyfall && make install && make dev",
+        },
+        {
+            "name": "Codenames",
+            "description": "Two teams, secret spymasters, a shared word board — find your words first.",
+            "url": f"http://localhost:{codenames_port}",
+            "path": "games/codenames",
+            "start": "cd games/codenames && make install && make dev",
         },
     ]
 
@@ -155,6 +171,8 @@ def main() -> None:
     parser.add_argument("--heads-up-port", type=int, default=8082, help="port Heads Up! runs on")
     parser.add_argument("--emoji-charades-port", type=int, default=8083, help="port Emoji Charades runs on")
     parser.add_argument("--name-that-tune-port", type=int, default=8084, help="port Name That Tune runs on")
+    parser.add_argument("--spyfall-port", type=int, default=3100, help="port Spyfall's frontend runs on")
+    parser.add_argument("--codenames-port", type=int, default=3200, help="port Codenames' frontend runs on")
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), Handler)
@@ -166,6 +184,8 @@ def main() -> None:
         args.heads_up_port,
         args.emoji_charades_port,
         args.name_that_tune_port,
+        args.spyfall_port,
+        args.codenames_port,
     )
     print(f"Revelry games hub running at http://localhost:{args.port}")
     try:
