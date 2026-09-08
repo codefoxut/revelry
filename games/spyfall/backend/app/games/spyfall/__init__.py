@@ -1,0 +1,2 @@
+DISPLAY_NAME = "Spyfall"
+MIN_PLAYERS = 3
