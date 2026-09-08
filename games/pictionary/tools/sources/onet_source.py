@@ -6,7 +6,7 @@ Labor, no API key) as candidate "professions" items.
 import csv
 from pathlib import Path
 
-import requests
+import httpx2
 
 ALTERNATE_TITLES_URL = (
     "https://www.onetcenter.org/dl_files/database/db_29_1_text/Alternate%20Titles.txt"
@@ -19,7 +19,7 @@ def _ensure_downloaded() -> None:
     if ALTERNATE_TITLES_PATH.exists():
         return
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    response = requests.get(ALTERNATE_TITLES_URL, timeout=60)
+    response = httpx2.get(ALTERNATE_TITLES_URL, timeout=60)
     response.raise_for_status()
     ALTERNATE_TITLES_PATH.write_bytes(response.content)
 

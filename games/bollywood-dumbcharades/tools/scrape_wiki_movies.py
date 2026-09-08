@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Optional
 
 import anthropic
-import requests
+import httpx2
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
@@ -85,7 +85,7 @@ fences, no prose, no commentary."""
 
 def fetch_page(year: int) -> str:
     url = WIKI_URL_TEMPLATE.format(year=year)
-    resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
+    resp = httpx2.get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
     resp.raise_for_status()
     return resp.text
 

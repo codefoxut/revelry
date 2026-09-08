@@ -13,14 +13,33 @@ DEFAULT_ENABLED_ROLE_KEYS: frozenset[str] = frozenset({"detective", "doctor"})
 _MAFIA_SUB_ROLE_KEYS: frozenset[str] = frozenset({"godfather"})
 
 
+# player_count -> (min_mafia, max_mafia, default_mafia), curated for good
+# gameplay across the room's 4-20 player range (app/platform/room_manager.py).
+# Mirrors MAFIA_COUNT_TABLE in frontend/lib/roles.ts -- both sides must agree
+# so the lobby's dropdown bounds always match what the server will accept.
+MAFIA_COUNT_TABLE: dict[int, tuple[int, int, int]] = {
+    4: (1, 1, 1), 5: (1, 1, 1), 6: (1, 2, 1), 7: (1, 2, 1),
+    8: (1, 2, 2), 9: (1, 3, 2), 10: (1, 3, 2), 11: (1, 3, 2),
+    12: (1, 4, 3), 13: (1, 4, 3), 14: (1, 4, 3), 15: (1, 5, 3),
+    16: (1, 5, 4), 17: (1, 5, 4), 18: (1, 6, 4), 19: (1, 6, 4),
+    20: (1, 6, 5),
+}
+
+
+def mafia_count_bounds(player_count: int) -> tuple[int, int, int]:
+    """Returns (min, max, default) mafia count for a player count, clamped
+    into the table's declared 4-20 range."""
+    return MAFIA_COUNT_TABLE[min(max(player_count, 4), 20)]
+
+
 def clamp_mafia_count(player_count: int, requested: int | None) -> int:
-    """Clamp a host-requested mafia count to a sane range: at least 1, and
-    never so many that fewer than 2 non-mafia players remain.
+    """Clamp a host-requested mafia count to the good-gameplay table's
+    range for this player count.
     """
+    min_mafia, max_mafia, default_mafia = mafia_count_bounds(player_count)
     if requested is None:
-        return max(1, player_count // 4)
-    max_mafia = max(1, min(player_count // 3, player_count - 2))
-    return max(1, min(requested, max_mafia))
+        return default_mafia
+    return max(min_mafia, min(requested, max_mafia))
 
 
 def build_composition(player_count: int, mafia_count: int, enabled_role_keys: frozenset[str]) -> list[Role]:

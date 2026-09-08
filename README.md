@@ -34,10 +34,12 @@ Modern party games for friends, families, and teams.
 ⬜ Guess the Word
 ✅ Charades
 ⬜ Truth or Dare
-⬜ Heads Up
+✅ Heads Up
 ✅ Pictionary
 ✅ Mafia
 ✅ Guess the Personality
+✅ Emoji Charades
+✅ Name That Tune
 ⬜ Codenames
 ⬜ Would You Rather
 ⬜ Trivia
@@ -115,3 +117,48 @@ echo "ANTHROPIC_API_KEY=your-key-here" > .env
 Then from the repo root: `make guess-the-personality`. Or directly: `make run`.
 
 Open http://localhost:8081.
+
+### [Heads Up!](games/heads-up)
+
+Category word game — phone on your forehead, teammates describe the word,
+tilt to score. Single device passed around the group; online AI-generated
+word packs or an offline curated word bank, chosen at setup.
+
+```bash
+cd games/heads-up
+echo "ANTHROPIC_API_KEY=your-key-here" > .env
+```
+
+Then from the repo root: `make heads-up`. Or directly: `make run`.
+
+Open http://localhost:8082.
+
+### [Emoji Charades](games/emoji-charades)
+
+Guess the movie, TV show, or phrase from an emoji clue — single screen,
+teams take turns shouting out guesses, pass to steal.
+
+```bash
+cd games/emoji-charades
+echo "ANTHROPIC_API_KEY=your-key-here" > .env
+```
+
+Then from the repo root: `make emoji-charades`. Or directly: `make run`.
+
+Open http://localhost:8083.
+
+### [Name That Tune](games/name-that-tune)
+
+Listen to a short melody and shout out the title — single screen, teams
+take turns, pass to steal. Offline-only: every tune is a public-domain
+melody synthesized live in the browser via the Web Audio API, no audio
+files or API key needed.
+
+Then from the repo root: `make name-that-tune`. Or directly:
+
+```bash
+cd games/name-that-tune
+make install && make run
+```
+
+Open http://localhost:8084.

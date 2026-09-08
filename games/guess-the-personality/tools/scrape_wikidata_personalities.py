@@ -51,7 +51,7 @@ import sys
 import time
 from pathlib import Path
 
-import requests
+import httpx2
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import personality_db  # noqa: E402
@@ -105,16 +105,24 @@ OCCUPATIONS: list[tuple[str, str]] = [
     ("Q15253558", "social activist"),
     ("Q3068305", "chef"),
     ("Q947873", "television presenter"),
+    ("Q116", "monarch"),
+    ("Q2304859", "sovereign"),
+    ("Q39018", "emperor"),
+    ("Q1097498", "ruler"),
 ]
 
 
 def _get(query: str, timeout: int = 55, retries: int = 4) -> dict | None:
     """GET a SPARQL query with retries/backoff. Returns parsed JSON, or None
     if every attempt failed (caller should skip/continue, not crash the
-    whole run over one flaky query)."""
+    whole run over one flaky query) — logs a warning in that case so a
+    silently-degraded scrape (fewer rows than expected) is traceable rather
+    than looking like a clean, complete run."""
+    last_status = None
+    last_error = None
     for attempt in range(retries):
         try:
-            r = requests.get(
+            r = httpx2.get(
                 SPARQL_URL,
                 params={"query": query, "format": "json"},
                 headers={"User-Agent": USER_AGENT},
@@ -123,9 +131,17 @@ def _get(query: str, timeout: int = 55, retries: int = 4) -> dict | None:
             if r.status_code == 200:
                 return r.json()
             # 429/502/503/504 -> transient, worth retrying with backoff
-        except requests.exceptions.RequestException:
-            pass
+            last_status = r.status_code
+        except httpx2.HTTPError as exc:
+            last_error = exc
         time.sleep(2 ** attempt)
+    print(
+        f"WARNING: SPARQL query failed after {retries} attempts "
+        f"(last_status={last_status}, last_error={last_error}); skipping. "
+        f"Query: {' '.join(query.split())[:200]}",
+        file=sys.stderr,
+        flush=True,
+    )
     return None
 
 
@@ -226,9 +242,11 @@ def _enrich_batch(qids: list[str]) -> dict[str, dict]:
             entry["description"] = b["desc"]["value"]
         if "genderLabel" in b:
             entry["gender"] = b["genderLabel"]["value"]
-        if "birthdate" in b:
+        # "unknown value" (P570 set but date unspecified) binds as a skolemized
+        # blank-node URI, not a date literal — guard against parsing it as a year.
+        if "birthdate" in b and b["birthdate"].get("type") == "literal":
             entry["birth_year"] = int(b["birthdate"]["value"][:4])
-        if "deathdate" in b:
+        if "deathdate" in b and b["deathdate"].get("type") == "literal":
             entry["death_year"] = int(b["deathdate"]["value"][:4])
         if "occupationLabel" in b:
             entry["occupations"].add(b["occupationLabel"]["value"])

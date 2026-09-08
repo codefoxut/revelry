@@ -7,7 +7,7 @@ import sys
 import time
 from collections import deque
 
-import requests
+import httpx2
 
 API_URL = "https://en.wikipedia.org/w/api.php"
 USER_AGENT = "pictionary-data-tool/1.0 (offline category-list builder; no LLM calls)"
@@ -36,14 +36,14 @@ def _get_with_retry(params: dict) -> dict:
     last_error = None
     for attempt in range(1, RETRY_ATTEMPTS + 1):
         try:
-            response = requests.get(API_URL, params=params, headers={"User-Agent": USER_AGENT}, timeout=20)
+            response = httpx2.get(API_URL, params=params, headers={"User-Agent": USER_AGENT}, timeout=20)
             if response.status_code == 429:
                 wait = float(response.headers.get("Retry-After", RETRY_DELAY_SECONDS))
                 time.sleep(wait)
                 continue
             response.raise_for_status()
             return response.json()
-        except requests.RequestException as exc:
+        except httpx2.HTTPError as exc:
             last_error = exc
             if attempt < RETRY_ATTEMPTS:
                 time.sleep(RETRY_DELAY_SECONDS)

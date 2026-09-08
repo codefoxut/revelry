@@ -11,12 +11,17 @@ without prior conversation context.
 
 - A single-page web app (`static/index.html`) talking to a small FastAPI
   backend (`main.py`).
-- The game logic itself — picking personalities, writing clues, scoring,
-  turn-taking, win condition — lives entirely in a system prompt handed to
-  Claude on every turn. The backend does not implement any game rules; it
-  is a thin, stateless-per-request relay that persists chat history.
-- There is no database, no personality list, no scoring code in Python.
-  Claude *is* the game engine.
+- The game logic itself — writing clues, scoring, turn-taking, win
+  condition — lives entirely in a system prompt handed to Claude on every
+  turn. The backend does not implement any game rules; it is a thin,
+  stateless-per-request relay that persists chat history.
+- **Personality selection is DB-grounded, not invented.** Claude used to
+  pick famous people purely from memory; it now only ever plays entries
+  sampled from a real SQLite database (`data/personalities.db`, ~100k+
+  Indian + ~100k+ additional non-Indian people, scraped from Wikidata) —
+  see [`PERSONALITY_DATABASE.md`](PERSONALITY_DATABASE.md). Claude still
+  writes the actual clues and hosts the show; it just can't invent a person
+  or a fact about them that isn't in the sampled pool.
 
 ## Architecture
 
@@ -25,23 +30,28 @@ Browser (static/index.html)
    │  fetch() JSON over HTTP
    ▼
 FastAPI (main.py)
-   │  loads/saves session JSON            │  anthropic SDK
-   ▼                                       ▼
-sessions/<session_id>.json          Claude (claude-opus-4-8)
+   │  loads/saves session JSON       │  samples pool   │  anthropic SDK
+   ▼                                  ▼                 ▼
+sessions/<session_id>.json   data/personalities.db   Claude (claude-opus-4-8)
 ```
 
-- **No database.** Each browser session gets a random UUID (generated
-  client-side, cached in `localStorage`) and a matching
-  `sessions/<uuid>.json` file on disk holding `{team_a, team_b, messages}`.
-  `messages` is the full Anthropic-format chat transcript
-  (`[{role, content}, ...]`) — the entire game state (score, current clue,
-  whose turn) lives implicitly inside that transcript, because it's fed
-  back to Claude as conversation history on every turn.
 - **No server-side game state machine.** The backend never parses scores,
   clue numbers, or turns. It just appends the user's message, sends the
   whole transcript + system prompt to Claude, appends the reply, and saves.
   Claude re-derives "whose turn, what clue, what score" from re-reading the
-  transcript each call.
+  transcript each call. This part of the design is unchanged by the
+  database — the DB only replaces *where the personalities and facts come
+  from*, not how turns/scoring are tracked.
+- **The personality pool is sampled once per game, not per round.** At
+  `/start`, the backend samples ~50 people for the chosen `category`
+  (`"india"` or `"world"`) from `personality_db.py` and stores that exact
+  list in the session file as `personality_pool`. Every subsequent `/chat`
+  call re-injects the *same* stored pool into the system prompt (via
+  `{PERSONALITY_POOL}`) rather than resampling — the pool is the game's
+  fixed "secret list" for its entire duration, the same way `used_titles`
+  stays stable across a `bollywood-dumbcharades` session. Claude picks
+  from that list, in any order, never repeating an entry, and never
+  reveals the `Name` field before it's guessed or the clues run out.
 - **Score display is a text convention, not structured data.** The system
   prompt requires Claude to emit a specific line — `**Score → {TEAM_A}: N |
   {TEAM_B}: N**` — and the frontend regex-matches that line out of the
@@ -56,12 +66,23 @@ sessions/<session_id>.json          Claude (claude-opus-4-8)
 {
   "team_a": "Alpha",
   "team_b": "Beta",
+  "category": "world",
+  "personality_pool": [
+    {"id": "q9682", "wikidata_qid": "Q9682", "name": "...", "is_indian": false,
+     "nationality": "...", "occupation": "...", "gender": "...",
+     "birth_year": 1946, "death_year": null, "description": "...", "sitelinks": 210}
+  ],
   "messages": [
     {"role": "user", "content": "Start the game! Teams are: Alpha and Beta."},
     {"role": "assistant", "content": "..."}
   ]
 }
 ```
+
+`personality_pool` is written once at `/start` (sampled from
+`data/personalities.db`, see [`PERSONALITY_DATABASE.md`](PERSONALITY_DATABASE.md))
+and never regenerated for that session — `/chat` reads it back verbatim to
+rebuild the system prompt each turn.
 
 `session_file()` sanitizes the session id to `[A-Za-z0-9-]` before using it
 as a filename — the only defense against path traversal via
@@ -72,24 +93,28 @@ as a filename — the only defense against path traversal via
 | Method | Path | Purpose |
 |---|---|---|
 | `GET`  | `/` | Serves `static/index.html` |
-| `POST` | `/start` | Body: `{session_id, team_a, team_b}`. Creates a fresh session, sends the internal trigger message `"Start the game! Teams are: X and Y."`, returns Claude's opening reply. |
-| `POST` | `/chat` | Body: `{session_id, message}`. Loads existing session, appends the user's message (a guess, "next clue", anything free-text), sends full history + system prompt to Claude, returns the reply. |
-| `GET`  | `/history/{session_id}` | Returns `{team_a, team_b, messages}` — used on page load to restore an in-progress game. |
+| `POST` | `/start` | Body: `{session_id, team_a, team_b, category}` (`category` is `"india"` or `"world"`, default `"world"`). Samples a fresh `personality_pool` for that category, creates the session, sends the internal trigger message `"Start the game! Teams are: X and Y."`, returns Claude's opening reply. |
+| `POST` | `/chat` | Body: `{session_id, message}`. Loads existing session (including its stored `personality_pool`), appends the user's message (a guess, "next clue", anything free-text), sends full history + system prompt to Claude, returns the reply. |
+| `GET`  | `/history/{session_id}` | Returns `{team_a, team_b, category, messages}` — used on page load to restore an in-progress game. |
 | `POST` | `/reset/{session_id}` | Deletes the session file. |
 
 All chat-bearing responses share the `ChatResponse` shape:
-`{reply, session_id, team_a, team_b}`.
+`{reply, session_id, team_a, team_b, category}`.
 
 ### System prompt (`SYSTEM_PROMPT_TEMPLATE`)
 
-Built once per request via `build_prompt(team_a, team_b)`, which does a
-plain `str.replace` on `{TEAM_A}` / `{TEAM_B}` placeholders — no Jinja/f-string,
-so literal `{`/`}` elsewhere in the template must be avoided or escaped.
+Built once per request via `build_prompt(team_a, team_b, personality_pool)`,
+which does a plain `str.replace` on `{TEAM_A}` / `{TEAM_B}` /
+`{PERSONALITY_POOL}` placeholders — no Jinja/f-string, so literal `{`/`}`
+elsewhere in the template must be avoided or escaped. `{PERSONALITY_POOL}`
+is filled in by `format_personality_pool()`, which renders each sampled row
+as a `- Name: ... | Facts: ...` bullet.
 
 Game rules encoded in the prompt (see `main.py` for exact wording):
 
-- Claude secretly picks one real personality per round, not reused within
-  the game (sports/cinema/science/history/music/politics — kept varied).
+- Claude picks one entry per round from the secret `{PERSONALITY_POOL}`
+  list only — never invented, never reused within the same game — and
+  writes clues strictly from that entry's `Facts` (no outside trivia).
 - Up to **5 clues**, cryptic → obvious. **One guess per clue.**
 - Scoring: correct on clue 1–5 → 5/4/3/2/1 points; still wrong after clue 5
   → 0 points, personality revealed, move on.
@@ -124,10 +149,16 @@ framework, no external JS/CSS dependencies.
   are cached in `localStorage['gtp_team_a'/'gtp_team_b']` purely for
   pre-filling the "New Game" modal — the source of truth for team names is
   always the backend session.
+- **Category selector**: the setup modal has a World/Indian-only toggle
+  (`selectCategory()`), sent as `category` on `POST /start` and cached in
+  `localStorage['gtp_category']` purely to pre-select it on the next "New
+  Game" — same treatment as team names, backend session is still the
+  source of truth.
 - **Page load flow**: fetch `/history/{sessionId}` →
-  - messages exist → replay them into the chat log, skip the internal
-    `"Start the game!"` trigger message, hide the setup modal.
-  - no messages → show the team-name setup modal.
+  - messages exist → replay them into the chat log, restore `category`,
+    skip the internal `"Start the game!"` trigger message, hide the setup
+    modal.
+  - no messages → show the team-name/category setup modal.
 - **Sending a message**: `sendMessage()` → optimistically renders the
   user's bubble → `POST /chat` → renders Claude's reply. Score badge is
   updated by regex-scanning the reply text (`extractScore()`) for the
@@ -145,7 +176,8 @@ framework, no external JS/CSS dependencies.
 ## Config, deployment, dependencies
 
 - `requirements.txt`: `fastapi[all]`, `anthropic`, `uvicorn[standard]`,
-  `python-dotenv`.
+  `python-dotenv`, `requests` (the last one only used by
+  `tools/scrape_wikidata_personalities.py`, not by gameplay itself).
 - `.env` (gitignored) must contain `ANTHROPIC_API_KEY=...`.
 - `Makefile` targets: `setup` (create `.venv`, idempotent via the
   `.venv/bin/activate` file target), `install` (depends on `setup`, then
@@ -166,15 +198,19 @@ framework, no external JS/CSS dependencies.
 
 ## Moving this to another repo — checklist
 
-1. Copy `main.py`, `static/index.html`, `requirements.txt`, `Makefile`,
-   `.gitignore`.
+1. Copy `main.py`, `personality_db.py`, `static/index.html`,
+   `requirements.txt`, `Makefile`, `.gitignore`, and `data/personalities.db`
+   (the populated database itself — see
+   [`PERSONALITY_DATABASE.md`](PERSONALITY_DATABASE.md); without it the app
+   still runs but every category samples zero personalities).
 2. Recreate `.env` with a valid `ANTHROPIC_API_KEY` — it's gitignored, so
    it won't come along in a copy/git-mv.
 3. `sessions/` and `.venv/` are gitignored and regenerate on first run —
    nothing to migrate there.
-4. No other app in this monorepo is imported by this one (unlike
-   `bollywood-dumbcharades`, which has a local `movie_db.py`) — this app
-   has zero intra-repo coupling, so a straight file copy is sufficient.
+4. This app now has one piece of intra-repo-style coupling: `main.py`
+   imports `personality_db.py` (same pattern as
+   `bollywood-dumbcharades`/`movie_db.py`) — both files must travel
+   together.
 5. Decide on a port if running alongside other local apps.
 
 ## Known limitations / things to watch
@@ -198,3 +234,14 @@ framework, no external JS/CSS dependencies.
   the filesystem, but there's no rate limiting or size cap on `message` —
   a malicious client could send arbitrarily large messages to run up API
   cost.
+- **Fixed pool per game.** The ~50-person `personality_pool` sampled at
+  `/start` is the entire universe of people playable for that session —
+  if the game somehow runs past 50 rounds without Claude noticing it's
+  exhausted the list, there's no fallback (no re-sampling mid-game, by
+  design — see the Architecture section above).
+- **India category is capped by real-world data, not code.** Wikidata has
+  roughly 94-95k humans with India listed as country of citizenship total
+  — `--target 100000` on `--category india` will plateau there rather than
+  reach 100k; the `world` category (occupation-scoped, no citizenship
+  filter) has no such ceiling. See
+  [`PERSONALITY_DATABASE.md`](PERSONALITY_DATABASE.md).

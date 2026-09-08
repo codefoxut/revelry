@@ -114,13 +114,42 @@ export const TOGGLEABLE_ROLE_KEYS: string[] = ROLE_CATALOG.filter(
 // Mirrors DEFAULT_ENABLED_ROLE_KEYS in role_assignment.py.
 export const DEFAULT_ENABLED_ROLE_KEYS: string[] = ["detective", "doctor"];
 
+// player_count -> { min, max, default } mafia count, curated for good
+// gameplay across the room's 4-20 player range. Mirrors MAFIA_COUNT_TABLE in
+// backend/app/games/mafia/role_assignment.py -- both sides must agree so the
+// lobby's dropdown bounds always match what the server will accept.
+export const MAFIA_COUNT_TABLE: Record<number, { min: number; max: number; default: number }> = {
+  4: { min: 1, max: 1, default: 1 },
+  5: { min: 1, max: 1, default: 1 },
+  6: { min: 1, max: 2, default: 1 },
+  7: { min: 1, max: 2, default: 1 },
+  8: { min: 1, max: 2, default: 2 },
+  9: { min: 1, max: 3, default: 2 },
+  10: { min: 1, max: 3, default: 2 },
+  11: { min: 1, max: 3, default: 2 },
+  12: { min: 1, max: 4, default: 3 },
+  13: { min: 1, max: 4, default: 3 },
+  14: { min: 1, max: 4, default: 3 },
+  15: { min: 1, max: 5, default: 3 },
+  16: { min: 1, max: 5, default: 4 },
+  17: { min: 1, max: 5, default: 4 },
+  18: { min: 1, max: 6, default: 4 },
+  19: { min: 1, max: 6, default: 4 },
+  20: { min: 1, max: 6, default: 5 },
+};
+
+// Mirrors mafia_count_bounds in role_assignment.py.
+export function mafiaCountBounds(playerCount: number): { min: number; max: number; default: number } {
+  return MAFIA_COUNT_TABLE[Math.min(Math.max(playerCount, 4), 20)];
+}
+
 // Mirrors clamp_mafia_count in role_assignment.py.
 export function clampMafiaCount(playerCount: number, requested: number | null): number {
+  const { min, max, default: defaultCount } = mafiaCountBounds(playerCount);
   if (requested === null) {
-    return Math.max(1, Math.floor(playerCount / 4));
+    return defaultCount;
   }
-  const maxMafia = Math.max(1, Math.min(Math.floor(playerCount / 3), playerCount - 2));
-  return Math.max(1, Math.min(requested, maxMafia));
+  return Math.max(min, Math.min(requested, max));
 }
 
 // Mirrors build_composition's overflow check in role_assignment.py: mafia
@@ -128,4 +157,33 @@ export function clampMafiaCount(playerCount: number, requested: number | null): 
 export function totalRoleSlots(mafiaCount: number, enabledRoleKeys: string[]): number {
   const specialCount = enabledRoleKeys.filter((key) => key !== "godfather").length;
   return mafiaCount + specialCount;
+}
+
+// Whether `roleKey` could be turned on (in addition to whatever's already
+// enabled) without breaking the game for this player/mafia count. Used to
+// grey out lobby role chips that wouldn't fit rather than letting the host
+// discover the problem only after hitting Start.
+export function isRoleAvailable(
+  roleKey: string,
+  playerCount: number,
+  mafiaCount: number,
+  enabledRoleKeys: string[],
+): boolean {
+  const withRole = enabledRoleKeys.includes(roleKey) ? enabledRoleKeys : [...enabledRoleKeys, roleKey];
+  if (totalRoleSlots(mafiaCount, withRole) > playerCount) return false;
+
+  if (roleKey === "terrorist") {
+    // Mirrors _check_win's mafia_alive >= town_alive parity rule in
+    // engine.py: a living Terrorist counts toward mafia_alive, so it needs
+    // enough town players left over that adding it doesn't create instant
+    // win-parity before anyone has even acted.
+    const mafiaAlive = mafiaCount + 1;
+    const townSpecialCount = enabledRoleKeys.filter(
+      (key) => key !== "terrorist" && ROLE_CATALOG.find((role) => role.key === key)?.team === "town",
+    ).length;
+    const townAlive = playerCount - mafiaCount - 1 - townSpecialCount;
+    if (townAlive <= mafiaAlive) return false;
+  }
+
+  return true;
 }

@@ -39,7 +39,7 @@ import gzip
 import re
 from pathlib import Path
 
-import requests
+import httpx2
 
 csv.field_size_limit(10_000_000)
 
@@ -65,10 +65,10 @@ def _ensure_downloaded(url: str, path: Path) -> None:
     if path.exists():
         return
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    with requests.get(url, stream=True, timeout=120) as response:
+    with httpx2.stream("GET", url, timeout=120) as response:
         response.raise_for_status()
         with open(path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=1024 * 1024):
+            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
                 f.write(chunk)
 
 

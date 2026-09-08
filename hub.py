@@ -8,7 +8,9 @@ install before running it.
 
 Usage:
     python3 hub.py [--port 4000] [--mafia-port 3000] [--charades-port 8080] \
-        [--guess-the-personality-port 8081] [--pictionary-port 9090]
+        [--guess-the-personality-port 8081] [--pictionary-port 9090] \
+        [--heads-up-port 8082] [--emoji-charades-port 8083] \
+        [--name-that-tune-port 8084]
 """
 
 import argparse
@@ -21,7 +23,15 @@ from urllib.parse import urlsplit
 TEMPLATES_DIR = Path(__file__).parent / "www" / "templates"
 
 
-def build_games(mafia_port: int, charades_port: int, guess_the_personality_port: int, pictionary_port: int) -> list[dict]:
+def build_games(
+    mafia_port: int,
+    charades_port: int,
+    guess_the_personality_port: int,
+    pictionary_port: int,
+    heads_up_port: int,
+    emoji_charades_port: int,
+    name_that_tune_port: int,
+) -> list[dict]:
     return [
         {
             "name": "Mafia",
@@ -50,6 +60,27 @@ def build_games(mafia_port: int, charades_port: int, guess_the_personality_port:
             "url": f"http://localhost:{pictionary_port}",
             "path": "games/pictionary",
             "start": "cd games/pictionary && make run",
+        },
+        {
+            "name": "Heads Up!",
+            "description": "Category word game, phone on your forehead, tilt to score.",
+            "url": f"http://localhost:{heads_up_port}",
+            "path": "games/heads-up",
+            "start": "cd games/heads-up && make run",
+        },
+        {
+            "name": "Emoji Charades",
+            "description": "Guess the movie, show, or phrase from an emoji clue.",
+            "url": f"http://localhost:{emoji_charades_port}",
+            "path": "games/emoji-charades",
+            "start": "cd games/emoji-charades && make run",
+        },
+        {
+            "name": "Name That Tune",
+            "description": "Listen to a synthesized melody and shout out the title.",
+            "url": f"http://localhost:{name_that_tune_port}",
+            "path": "games/name-that-tune",
+            "start": "cd games/name-that-tune && make run",
         },
     ]
 
@@ -121,11 +152,20 @@ def main() -> None:
         help="port Guess the Personality runs on",
     )
     parser.add_argument("--pictionary-port", type=int, default=9090, help="port Pictionary runs on")
+    parser.add_argument("--heads-up-port", type=int, default=8082, help="port Heads Up! runs on")
+    parser.add_argument("--emoji-charades-port", type=int, default=8083, help="port Emoji Charades runs on")
+    parser.add_argument("--name-that-tune-port", type=int, default=8084, help="port Name That Tune runs on")
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), Handler)
     server.games = build_games(
-        args.mafia_port, args.charades_port, args.guess_the_personality_port, args.pictionary_port
+        args.mafia_port,
+        args.charades_port,
+        args.guess_the_personality_port,
+        args.pictionary_port,
+        args.heads_up_port,
+        args.emoji_charades_port,
+        args.name_that_tune_port,
     )
     print(f"Revelry games hub running at http://localhost:{args.port}")
     try:

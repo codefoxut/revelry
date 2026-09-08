@@ -2,4 +2,4 @@ fastapi[all]
 anthropic
 uvicorn[standard]
 python-dotenv
-requests
+httpx2

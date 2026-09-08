@@ -2,7 +2,12 @@ import random
 
 import pytest
 
-from app.games.mafia.role_assignment import assign_roles, build_composition, clamp_mafia_count
+from app.games.mafia.role_assignment import (
+    assign_roles,
+    build_composition,
+    clamp_mafia_count,
+    mafia_count_bounds,
+)
 from app.games.mafia.roles import Team
 from app.platform.exceptions import InvalidGameSettingsError
 
@@ -52,6 +57,18 @@ def test_clamp_mafia_count_never_leaves_fewer_than_two_non_mafia():
 
 def test_clamp_mafia_count_respects_a_valid_request():
     assert clamp_mafia_count(12, 3) == 3
+
+
+def test_mafia_count_bounds_matches_the_good_gameplay_table():
+    assert mafia_count_bounds(4) == (1, 1, 1)
+    assert mafia_count_bounds(9) == (1, 3, 2)
+    assert mafia_count_bounds(15) == (1, 5, 3)
+    assert mafia_count_bounds(20) == (1, 6, 5)
+
+
+def test_mafia_count_bounds_clamps_out_of_range_counts_to_the_table_edges():
+    assert mafia_count_bounds(2) == mafia_count_bounds(4)
+    assert mafia_count_bounds(100) == mafia_count_bounds(20)
 
 
 def test_build_composition_fills_remaining_slots_with_villagers():

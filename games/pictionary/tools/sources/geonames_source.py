@@ -6,7 +6,7 @@ needed — it's a plain static file download.
 import zipfile
 from pathlib import Path
 
-import requests
+import httpx2
 
 CITIES_URL = "https://download.geonames.org/export/dump/cities500.zip"
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
@@ -24,7 +24,7 @@ def _ensure_downloaded() -> None:
     if TXT_PATH.exists():
         return
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    response = requests.get(CITIES_URL, timeout=120)
+    response = httpx2.get(CITIES_URL, timeout=120)
     response.raise_for_status()
     ZIP_PATH.write_bytes(response.content)
     with zipfile.ZipFile(ZIP_PATH) as zf:

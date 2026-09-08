@@ -1,4 +1,4 @@
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 
 from app.main import app
 

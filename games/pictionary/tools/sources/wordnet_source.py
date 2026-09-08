@@ -7,8 +7,8 @@ import io
 import zipfile
 from pathlib import Path
 
+import httpx2
 import nltk
-import requests
 
 WORDNET_ZIP_URL = "https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet.zip"
 NLTK_DATA_DIR = Path.home() / "nltk_data"
@@ -36,7 +36,7 @@ def ensure_wordnet() -> None:
 
     corpora_dir = NLTK_DATA_DIR / "corpora"
     corpora_dir.mkdir(parents=True, exist_ok=True)
-    response = requests.get(WORDNET_ZIP_URL, timeout=60)
+    response = httpx2.get(WORDNET_ZIP_URL, timeout=60)
     response.raise_for_status()
     with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
         zf.extractall(corpora_dir)

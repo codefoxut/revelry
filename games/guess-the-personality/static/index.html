@@ -347,6 +347,27 @@
       opacity: 0.7;
     }
 
+    .category-toggle { display: flex; gap: 10px; }
+    .category-btn {
+      flex: 1;
+      background: rgba(0,0,0,0.35);
+      border: 1.5px solid rgba(242, 201, 76, 0.3);
+      border-radius: 6px;
+      padding: 10px 8px;
+      color: var(--pale-gold);
+      font-family: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.3px;
+    }
+    .category-btn:hover { border-color: rgba(242, 201, 76, 0.6); }
+    .category-btn.active {
+      background: linear-gradient(135deg, var(--violet) 0%, #3A2166 100%);
+      border-color: rgba(242, 201, 76, 0.7);
+      box-shadow: 0 0 14px rgba(242, 201, 76, 0.25);
+    }
+
     .team-field { margin-bottom: 18px; }
     .team-field label {
       display: block;
@@ -419,6 +440,14 @@
         <p>★ enter your team names ★</p>
       </div>
       <div class="modal-divider"></div>
+
+      <div class="team-field">
+        <label><span>🌍</span> Personality Pool</label>
+        <div class="category-toggle" id="categoryToggle">
+          <button type="button" class="category-btn" data-category="world" onclick="selectCategory('world')">🌍 World</button>
+          <button type="button" class="category-btn" data-category="india" onclick="selectCategory('india')">🇮🇳 Indian Only</button>
+        </div>
+      </div>
 
       <div class="team-field">
         <label><span>🔴</span> Team One</label>
@@ -533,6 +562,17 @@
     localStorage.setItem('gtp_team_b', b);
   }
 
+  /* ── CATEGORY (World / Indian only) ── */
+  let selectedCategory = localStorage.getItem('gtp_category') || 'world';
+
+  function selectCategory(category) {
+    selectedCategory = category;
+    localStorage.setItem('gtp_category', category);
+    document.querySelectorAll('.category-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.category === category);
+    });
+  }
+
   function extractScore(text) {
     // Match "Score → <anything>: N | <anything>: N"
     const m = text.match(/Score\s*[→\-:]+\s*(.+?):\s*(\d+)\s*\|\s*(.+?):\s*(\d+)/i);
@@ -635,6 +675,7 @@
     // Pre-fill if we have names from a previous game
     document.getElementById('teamAInput').value = teamA !== 'Team A' ? teamA : '';
     document.getElementById('teamBInput').value = teamB !== 'Team B' ? teamB : '';
+    selectCategory(selectedCategory);
     document.getElementById('modalOverlay').classList.remove('hidden');
     setTimeout(() => document.getElementById('teamAInput').focus(), 100);
   }
@@ -654,11 +695,12 @@
       const res = await fetch('/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, team_a: a, team_b: b })
+        body: JSON.stringify({ session_id: sessionId, team_a: a, team_b: b, category: selectedCategory })
       });
       if (!res.ok) throw new Error();
       const d = await res.json();
       saveTeamNames(d.team_a, d.team_b);
+      selectCategory(d.category);
       hideModal();
       addMessage('host', d.reply);
     } catch {
@@ -697,8 +739,9 @@
       const messages = data.messages || [];
 
       if (messages.length > 0) {
-        // Restore team names and chat history
+        // Restore team names, category, and chat history
         saveTeamNames(data.team_a || 'Team A', data.team_b || 'Team B');
+        selectCategory(data.category || 'world');
         removeSplash();
         // Skip the internal "Start the game!" user trigger — show from index 1
         const displayFrom = (messages[0]?.role === 'user' && messages[0]?.content?.startsWith('Start the game!')) ? 1 : 0;
