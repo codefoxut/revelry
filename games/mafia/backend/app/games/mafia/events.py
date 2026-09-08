@@ -26,6 +26,7 @@ class RoleAssignedEvent(Event):
     team: str
     description: str
     acts_at_night: bool
+    allow_self_target: bool
 
 
 class InvestigationResultEvent(Event):
@@ -40,9 +41,10 @@ class InvestigationResultEvent(Event):
 
 class NightResultEvent(Event):
     """Public announcement of who (if anyone) died overnight. Never says
-    who did what — just the outcome."""
+    who did what — just the outcome. A list since more than one kill source
+    (mafia, vigilante, serial killer) can resolve in the same night."""
 
-    eliminated_player_id: str | None
+    eliminated_player_ids: list[str]
 
 
 class EliminationResultEvent(Event):
@@ -86,3 +88,21 @@ class MafiaTargetsUpdatedEvent(Event):
     """
 
     picks: list[MafiaPick]
+
+
+class MayorRevealedEvent(Event):
+    """Public announcement that a Mayor has revealed and now votes with
+    doubled weight."""
+
+    player_id: str
+
+
+class TerroristBombStatusEvent(Event):
+    """The Terrorist's own bomb state after a night resolves — private,
+    delivered only to the Terrorist. Lets their UI show "bomb pending on
+    X" or "no bomb" going into the next round.
+    """
+
+    player_id: str
+    pending: bool
+    target_player_id: str | None

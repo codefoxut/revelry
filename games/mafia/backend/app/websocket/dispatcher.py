@@ -1,18 +1,23 @@
 from __future__ import annotations
 
 from app.games.mafia.conflict_resolution import ConflictResolution
+from app.games.mafia.day_tie_resolution import DayTieResolution
 from app.games.mafia.events import (
     EliminationResultEvent as EngineEliminationResultEvent,
     GameOverEvent as EngineGameOverEvent,
     InvestigationResultEvent as EngineInvestigationResultEvent,
     MafiaTargetsUpdatedEvent as EngineMafiaTargetsUpdatedEvent,
+    MayorRevealedEvent as EngineMayorRevealedEvent,
     NightResultEvent as EngineNightResultEvent,
+    TerroristBombStatusEvent as EngineTerroristBombStatusEvent,
 )
 from app.games.mafia.events import RoleAssignedEvent as EngineRoleAssignedEvent
 from app.games.mafia.phases import MafiaPhase
+from app.games.mafia.roles import ROLE_REGISTRY
 from app.platform.exceptions import (
     GameAlreadyStartedError,
     GameNotStartedError,
+    InvalidGameSettingsError,
     InvalidGameStateError,
     NotEnoughPlayersError,
     PermissionDeniedError,
@@ -31,11 +36,13 @@ from app.schemas.ws_events import (
     KickedEvent,
     MafiaNightPicksEvent,
     MafiaPickOut,
+    MayorRevealedEvent,
     NightResultEvent,
     NightTimerStartedEvent,
     PongEvent,
     RoleAssignedEvent,
     RoleRevealOut,
+    TerroristBombStatusEvent,
     VoteCastEvent,
 )
 from app.services.room_presenter import broadcast_room_state
@@ -45,6 +52,8 @@ from app.websocket.connection_manager import ConnectionManager
 _CLOSE_KICKED = 4403
 
 _CONFLICT_RESOLUTION_VALUES = {mode.value for mode in ConflictResolution}
+_DAY_TIE_RESOLUTION_VALUES = {mode.value for mode in DayTieResolution}
+_ROLE_KEY_VALUES = set(ROLE_REGISTRY.keys()) - {"villager", "mafia"}
 
 
 async def dispatch_client_event(
@@ -110,6 +119,14 @@ async def dispatch_client_event(
 
     if event_type == "cast_vote":
         await _handle_cast_vote(raw_event, room_code, player_id, game_session_manager, connection_manager)
+        return False
+
+    if event_type == "reveal_mayor":
+        await _handle_reveal_mayor(room_code, player_id, game_session_manager, connection_manager)
+        return False
+
+    if event_type == "withdraw_bomb":
+        await _handle_withdraw_bomb(room_code, player_id, game_session_manager, connection_manager)
         return False
 
     await _send_error(connection_manager, room_code, player_id, "unknown_event", f"Unrecognized event type: {event_type!r}")
@@ -224,9 +241,44 @@ async def _handle_start_game(
         )
         return
 
+    day_tie_resolution_raw = raw_event.get("day_tie_resolution", "no_elimination")
+    if day_tie_resolution_raw not in _DAY_TIE_RESOLUTION_VALUES:
+        await _send_error(
+            connection_manager,
+            room_code,
+            player_id,
+            "invalid_payload",
+            f"`day_tie_resolution` must be one of {sorted(_DAY_TIE_RESOLUTION_VALUES)}",
+        )
+        return
+
+    mafia_count_raw = raw_event.get("mafia_count")
+    if mafia_count_raw is not None and not isinstance(mafia_count_raw, int):
+        await _send_error(connection_manager, room_code, player_id, "invalid_payload", "`mafia_count` must be an integer")
+        return
+
+    enabled_role_keys_raw = raw_event.get("enabled_role_keys")
+    if enabled_role_keys_raw is not None:
+        if not isinstance(enabled_role_keys_raw, list) or not all(
+            key in _ROLE_KEY_VALUES for key in enabled_role_keys_raw
+        ):
+            await _send_error(
+                connection_manager,
+                room_code,
+                player_id,
+                "invalid_payload",
+                f"`enabled_role_keys` must be a list from {sorted(_ROLE_KEY_VALUES)}",
+            )
+            return
+
     try:
         _, events = await game_session_manager.start_game(
-            room_code, player_id, ConflictResolution(conflict_resolution_raw)
+            room_code,
+            player_id,
+            ConflictResolution(conflict_resolution_raw),
+            DayTieResolution(day_tie_resolution_raw),
+            mafia_count_raw,
+            frozenset(enabled_role_keys_raw) if enabled_role_keys_raw is not None else None,
         )
     except PermissionDeniedError as exc:
         await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
@@ -236,6 +288,9 @@ async def _handle_start_game(
         return
     except NotEnoughPlayersError as exc:
         await _send_error(connection_manager, room_code, player_id, "not_enough_players", str(exc))
+        return
+    except InvalidGameSettingsError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_settings", str(exc))
         return
 
     for event in events:
@@ -275,7 +330,7 @@ async def _broadcast_advance_events(events: list, room_code: str, connection_man
     for event in events:
         if isinstance(event, EngineNightResultEvent):
             await connection_manager.broadcast(
-                room_code, NightResultEvent(eliminated_player_id=event.eliminated_player_id)
+                room_code, NightResultEvent(eliminated_player_ids=event.eliminated_player_ids)
             )
         elif isinstance(event, EngineEliminationResultEvent):
             await connection_manager.broadcast(
@@ -296,6 +351,12 @@ async def _broadcast_advance_events(events: list, room_code: str, connection_man
                         for reveal in event.roles
                     ],
                 ),
+            )
+        elif isinstance(event, EngineTerroristBombStatusEvent):
+            await connection_manager.send_to_player(
+                room_code,
+                event.player_id,
+                TerroristBombStatusEvent(pending=event.pending, target_player_id=event.target_player_id),
             )
 
 
@@ -443,6 +504,42 @@ async def _handle_cast_vote(
     await connection_manager.broadcast(room_code, VoteCastEvent(player_id=player_id, target_player_id=target_id))
 
 
+async def _handle_reveal_mayor(
+    room_code: str,
+    player_id: str,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+) -> None:
+    try:
+        events = await game_session_manager.reveal_mayor(room_code, player_id)
+    except GameNotStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except InvalidGameStateError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
+        return
+
+    for event in events:
+        if isinstance(event, EngineMayorRevealedEvent):
+            await connection_manager.broadcast(room_code, MayorRevealedEvent(player_id=event.player_id))
+
+
+async def _handle_withdraw_bomb(
+    room_code: str,
+    player_id: str,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+) -> None:
+    try:
+        await game_session_manager.withdraw_bomb(room_code, player_id)
+    except GameNotStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except InvalidGameStateError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
+        return
+
+
 def _to_ws_role_assigned(event: EngineRoleAssignedEvent) -> RoleAssignedEvent:
     return RoleAssignedEvent(
         role=RoleOut(
@@ -451,6 +548,7 @@ def _to_ws_role_assigned(event: EngineRoleAssignedEvent) -> RoleAssignedEvent:
             team=event.team,
             description=event.description,
             acts_at_night=event.acts_at_night,
+            allow_self_target=event.allow_self_target,
         )
     )
 

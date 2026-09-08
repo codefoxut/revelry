@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Literal
 
 import anthropic
 from dotenv import load_dotenv
@@ -8,6 +9,8 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+import personality_db
 
 load_dotenv()
 
@@ -22,10 +25,17 @@ SYSTEM_PROMPT_TEMPLATE = """You are the host of "Guess the Personality" — a pa
 - **{TEAM_A}**
 - **{TEAM_B}**
 
+## Secret personality list
+This is the ONLY pool of personalities you may use this game. Never invent a
+personality that isn't on this list, and never reuse one already used earlier this
+game. Build every clue only from that entry's Facts — you may phrase them more
+naturally, but do not add outside trivia the Facts don't support.
+
+{PERSONALITY_POOL}
+
 ## Rules
-1. On each team's turn, secretly pick ONE real, famous personality (actor, athlete,
-   scientist, musician, historical figure, world leader, author, etc.) that you have
-   not used yet this game.
+1. On each team's turn, secretly pick ONE entry from the secret list above that you
+   have not used yet this game.
 2. Give **Clue #1** — cryptic and hard, no names, no direct giveaways.
 3. The team gets exactly ONE guess per clue.
    - If they guess correctly: award points based on the clue number they guessed on —
@@ -77,7 +87,7 @@ def load_session(session_id: str) -> dict:
     path = session_file(session_id)
     if path.exists():
         return json.loads(path.read_text())
-    return {"team_a": "Team A", "team_b": "Team B", "messages": []}
+    return {"team_a": "Team A", "team_b": "Team B", "category": "world", "personality_pool": [], "messages": []}
 
 
 def save_session(session_id: str, data: dict) -> None:
@@ -90,8 +100,26 @@ def delete_session(session_id: str) -> None:
         path.unlink()
 
 
-def build_prompt(team_a: str, team_b: str) -> str:
-    return SYSTEM_PROMPT_TEMPLATE.replace("{TEAM_A}", team_a).replace("{TEAM_B}", team_b)
+def format_personality_pool(pool: list[dict]) -> str:
+    if not pool:
+        return "(no personalities available — tell the players to start a new game)"
+    lines = []
+    for p in pool:
+        facts = p.get("occupation") or "notable figure"
+        nationality = p.get("nationality") or "unknown nationality"
+        born = f"born {p['birth_year']}" if p.get("birth_year") else "birth year unknown"
+        died = f", died {p['death_year']}" if p.get("death_year") else ""
+        desc = f" — {p['description']}" if p.get("description") else ""
+        lines.append(f"- Name: {p['name']} | Facts: {facts}, {nationality}, {born}{died}{desc}")
+    return "\n".join(lines)
+
+
+def build_prompt(team_a: str, team_b: str, personality_pool: list[dict]) -> str:
+    return (
+        SYSTEM_PROMPT_TEMPLATE.replace("{TEAM_A}", team_a)
+        .replace("{TEAM_B}", team_b)
+        .replace("{PERSONALITY_POOL}", format_personality_pool(personality_pool))
+    )
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
@@ -100,6 +128,7 @@ class StartRequest(BaseModel):
     session_id: str
     team_a: str
     team_b: str
+    category: Literal["india", "world"] = "world"
 
 
 class ChatRequest(BaseModel):
@@ -112,24 +141,36 @@ class ChatResponse(BaseModel):
     session_id: str
     team_a: str
     team_b: str
+    category: str
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 
+POOL_SIZE = 50
+
+
 @app.post("/start", response_model=ChatResponse)
 async def start_game(req: StartRequest):
-    """Save team names and send the opening message to Claude."""
+    """Save team names, sample this game's secret personality pool, and send
+    the opening message to Claude."""
     team_a = req.team_a.strip() or "Team A"
     team_b = req.team_b.strip() or "Team B"
+    pool = personality_db.sample_personalities(req.category, POOL_SIZE)
 
-    data = {"team_a": team_a, "team_b": team_b, "messages": []}
+    data = {
+        "team_a": team_a,
+        "team_b": team_b,
+        "category": req.category,
+        "personality_pool": pool,
+        "messages": [],
+    }
     first_msg = f"Start the game! Teams are: {team_a} and {team_b}."
     data["messages"].append({"role": "user", "content": first_msg})
 
     response = client.messages.create(
         model="claude-opus-4-8",
         max_tokens=1024,
-        system=build_prompt(team_a, team_b),
+        system=build_prompt(team_a, team_b, pool),
         messages=data["messages"],
     )
 
@@ -137,7 +178,9 @@ async def start_game(req: StartRequest):
     data["messages"].append({"role": "assistant", "content": reply})
     save_session(req.session_id, data)
 
-    return ChatResponse(reply=reply, session_id=req.session_id, team_a=team_a, team_b=team_b)
+    return ChatResponse(
+        reply=reply, session_id=req.session_id, team_a=team_a, team_b=team_b, category=req.category
+    )
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -148,7 +191,7 @@ async def chat(req: ChatRequest):
     response = client.messages.create(
         model="claude-opus-4-8",
         max_tokens=1024,
-        system=build_prompt(data["team_a"], data["team_b"]),
+        system=build_prompt(data["team_a"], data["team_b"], data.get("personality_pool", [])),
         messages=data["messages"],
     )
 
@@ -161,6 +204,7 @@ async def chat(req: ChatRequest):
         session_id=req.session_id,
         team_a=data["team_a"],
         team_b=data["team_b"],
+        category=data.get("category", "world"),
     )
 
 
@@ -170,6 +214,7 @@ async def get_history(session_id: str):
     return {
         "team_a": data["team_a"],
         "team_b": data["team_b"],
+        "category": data.get("category", "world"),
         "messages": data["messages"],
     }
 

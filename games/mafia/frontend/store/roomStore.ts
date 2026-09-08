@@ -6,7 +6,7 @@ import type { ClientCommand, MafiaPickOut, RoleOut } from "@/types/ws-events";
 type ConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "closed";
 
 interface NightResult {
-  eliminatedPlayerId: string | null;
+  eliminatedPlayerIds: string[];
 }
 
 interface EliminationResult {
@@ -35,6 +35,11 @@ interface NightTimer {
   deadlineAt: number;
 }
 
+interface TerroristBomb {
+  pending: boolean;
+  targetPlayerId: string | null;
+}
+
 interface RoomStoreState {
   room: Room | null;
   selfPlayerId: string | null;
@@ -51,6 +56,8 @@ interface RoomStoreState {
   votes: Record<string, string>;
   mafiaPicks: MafiaPickOut[];
   nightTimer: NightTimer | null;
+  revealedMayorIds: string[];
+  terroristBomb: TerroristBomb | null;
   connect: (roomCode: string, playerId: string) => void;
   disconnect: () => void;
   sendCommand: (command: ClientCommand) => void;
@@ -72,6 +79,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   votes: {},
   mafiaPicks: [],
   nightTimer: null,
+  revealedMayorIds: [],
+  terroristBomb: null,
 
   connect: (roomCode, playerId) => {
     get().socket?.close();
@@ -126,7 +135,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
             set({ investigationResult: { targetPlayerId: event.target_player_id, team: event.team } });
             break;
           case "night_result":
-            set({ nightResult: { eliminatedPlayerId: event.eliminated_player_id } });
+            set({ nightResult: { eliminatedPlayerIds: event.eliminated_player_ids } });
             break;
           case "elimination_result":
             set({ eliminationResult: { eliminatedPlayerId: event.eliminated_player_id } });
@@ -158,6 +167,16 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
               },
             });
             break;
+          case "mayor_revealed":
+            set((state) => ({
+              revealedMayorIds: state.revealedMayorIds.includes(event.player_id)
+                ? state.revealedMayorIds
+                : [...state.revealedMayorIds, event.player_id],
+            }));
+            break;
+          case "terrorist_bomb_status":
+            set({ terroristBomb: { pending: event.pending, targetPlayerId: event.target_player_id } });
+            break;
           case "pong":
             break;
         }
@@ -180,6 +199,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       votes: {},
       mafiaPicks: [],
       nightTimer: null,
+      revealedMayorIds: [],
+      terroristBomb: null,
     });
     socket.connect();
   },

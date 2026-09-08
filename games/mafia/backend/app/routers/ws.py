@@ -79,6 +79,7 @@ async def room_socket(
                     team=role.team.value,
                     description=role.description,
                     acts_at_night=role.acts_at_night,
+                    allow_self_target=role.allow_self_target,
                 )
             ),
         )

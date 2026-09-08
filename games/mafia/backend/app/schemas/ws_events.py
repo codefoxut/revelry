@@ -59,10 +59,12 @@ class InvestigationResultEvent(BaseModel):
 
 
 class NightResultEvent(BaseModel):
-    """Public announcement of who (if anyone) died overnight."""
+    """Public announcement of who (if anyone) died overnight. A list since
+    more than one kill source (mafia, vigilante, serial killer) can resolve
+    in the same night."""
 
     type: Literal["night_result"] = "night_result"
-    eliminated_player_id: str | None
+    eliminated_player_ids: list[str]
 
 
 class EliminationResultEvent(BaseModel):
@@ -113,6 +115,14 @@ class MafiaNightPicksEvent(BaseModel):
     picks: list[MafiaPickOut]
 
 
+class MayorRevealedEvent(BaseModel):
+    """Public announcement that a Mayor has revealed and now votes with
+    doubled weight."""
+
+    type: Literal["mayor_revealed"] = "mayor_revealed"
+    player_id: str
+
+
 class NightTimerStartedEvent(BaseModel):
     """Public: a new night decision window has started, giving mafia
     `duration_seconds` to lock in a shared target before the night
@@ -121,6 +131,16 @@ class NightTimerStartedEvent(BaseModel):
 
     type: Literal["night_timer_started"] = "night_timer_started"
     duration_seconds: float
+
+
+class TerroristBombStatusEvent(BaseModel):
+    """The Terrorist's own bomb state after a night resolves — sent only to
+    them, never broadcast.
+    """
+
+    type: Literal["terrorist_bomb_status"] = "terrorist_bomb_status"
+    pending: bool
+    target_player_id: str | None
 
 
 # ---- Client -> Server ----
@@ -157,10 +177,17 @@ class LeaveRoomCommand(BaseModel):
 class StartGameCommand(BaseModel):
     """Host-only: moves the room out of the lobby into the game's first
     phase (Mafia: NIGHT).
+
+    `mafia_count`/`enabled_role_keys` configure the role composition; both
+    default to the app's original fixed roster when omitted (see
+    role_assignment.py).
     """
 
     type: Literal["start_game"] = "start_game"
     conflict_resolution: Literal["kill_any", "no_kill"] = "kill_any"
+    day_tie_resolution: Literal["no_elimination", "random_among_tied"] = "no_elimination"
+    mafia_count: int | None = None
+    enabled_role_keys: list[str] | None = None
 
 
 class AdvancePhaseCommand(BaseModel):
@@ -194,3 +221,19 @@ class LockNightActionCommand(BaseModel):
     """
 
     type: Literal["lock_night_action"] = "lock_night_action"
+
+
+class RevealMayorCommand(BaseModel):
+    """The Mayor publicly revealing to permanently double their vote
+    weight. Idempotent — a second reveal is a no-op rather than an error.
+    """
+
+    type: Literal["reveal_mayor"] = "reveal_mayor"
+
+
+class WithdrawBombCommand(BaseModel):
+    """The Terrorist withdrawing their currently-armed bomb before it
+    detonates. Only valid while a bomb is pending.
+    """
+
+    type: Literal["withdraw_bomb"] = "withdraw_bomb"

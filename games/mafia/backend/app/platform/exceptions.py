@@ -34,3 +34,12 @@ class InvalidGameStateError(Exception):
     """Raised when a game action is illegal in the engine's current phase
     (e.g. advancing past a terminal phase).
     """
+
+
+class InvalidGameSettingsError(Exception):
+    """Raised when a host's chosen pre-game settings (role selection, mafia
+    count) can't produce a valid role composition for the player count —
+    e.g. more roles enabled than there are players. Never silently dropped
+    or clamped, since a hidden-information game must not silently omit a
+    role the host explicitly enabled.
+    """

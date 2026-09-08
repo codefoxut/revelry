@@ -32,6 +32,7 @@ class RoleOut(BaseModel):
     team: str
     description: str
     acts_at_night: bool
+    allow_self_target: bool
 
 
 class GameStateOut(BaseModel):

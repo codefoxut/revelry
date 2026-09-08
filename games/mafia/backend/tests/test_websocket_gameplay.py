@@ -169,6 +169,108 @@ def test_game_over_broadcasts_a_full_role_reveal_to_every_socket(isolated_manage
             socket.receive_json()  # room_state
 
 
+def test_start_game_with_custom_role_selection_assigns_the_configured_roster(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    guest_ids = [_join_room(isolated_manager, room.code, display_name=f"P{i}")[1] for i in range(3)]
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[0]}") as g0, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[1]}") as g1, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[2]}") as g2:
+        sockets = {host_id: host_socket, guest_ids[0]: g0, guest_ids[1]: g1, guest_ids[2]: g2}
+        _drain_connect_messages(host_socket, g0, g1, g2)
+
+        host_socket.send_json(
+            {"type": "start_game", "mafia_count": 1, "enabled_role_keys": ["bodyguard"]}
+        )
+        role_keys = []
+        for socket in sockets.values():
+            role_event = socket.receive_json()  # role_assigned
+            assert role_event["type"] == "role_assigned"
+            role_keys.append(role_event["role"]["key"])
+            socket.receive_json()  # room_state (night, round 1)
+
+        assert sorted(role_keys) == ["bodyguard", "mafia", "villager", "villager"]
+
+
+def test_start_game_with_overflowing_role_settings_returns_invalid_game_settings_error(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    for i in range(3):
+        _join_room(isolated_manager, room.code, display_name=f"P{i}")
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket:
+        host_socket.receive_json()  # initial room_state
+        host_socket.send_json(
+            {
+                "type": "start_game",
+                "mafia_count": 2,
+                "enabled_role_keys": ["detective", "doctor", "bodyguard", "vigilante"],
+            }
+        )
+        error_event = host_socket.receive_json()
+
+        assert error_event["type"] == "error"
+        assert error_event["code"] == "invalid_game_settings"
+
+
+def test_start_game_with_an_unknown_role_key_returns_invalid_payload_error(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    for i in range(3):
+        _join_room(isolated_manager, room.code, display_name=f"P{i}")
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket:
+        host_socket.receive_json()  # initial room_state
+        host_socket.send_json({"type": "start_game", "enabled_role_keys": ["wizard"]})
+        error_event = host_socket.receive_json()
+
+        assert error_event["type"] == "error"
+        assert error_event["code"] == "invalid_payload"
+
+
+def test_reveal_mayor_broadcasts_to_every_socket(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    guest_ids = [_join_room(isolated_manager, room.code, display_name=f"P{i}")[1] for i in range(3)]
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[0]}") as g0, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[1]}") as g1, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[2]}") as g2:
+        sockets = {host_id: host_socket, guest_ids[0]: g0, guest_ids[1]: g1, guest_ids[2]: g2}
+        _drain_connect_messages(host_socket, g0, g1, g2)
+
+        # NO_KILL guarantees the night resolves with zero deaths even though
+        # no one submits a mafia action, so the mayor is guaranteed to still
+        # be alive to reveal during the day regardless of who gets it.
+        host_socket.send_json(
+            {"type": "start_game", "conflict_resolution": "no_kill", "enabled_role_keys": ["mayor"]}
+        )
+        mayor_id = None
+        for player_id, socket in sockets.items():
+            role_event = socket.receive_json()  # role_assigned
+            if role_event["role"]["key"] == "mayor":
+                mayor_id = player_id
+            socket.receive_json()  # room_state (night, round 1)
+        for socket in sockets.values():
+            socket.receive_json()  # night_timer_started
+        assert mayor_id is not None
+
+        host_socket.send_json({"type": "advance_phase"})  # NIGHT -> DAY
+        for socket in sockets.values():
+            night_result = socket.receive_json()
+            assert night_result["eliminated_player_ids"] == []
+            socket.receive_json()  # room_state
+
+        sockets[mayor_id].send_json({"type": "reveal_mayor"})
+        for socket in sockets.values():
+            event = socket.receive_json()
+            assert event["type"] == "mayor_revealed"
+            assert event["player_id"] == mayor_id
+
+
 def test_night_action_delivers_investigation_result_only_to_detective(isolated_manager):
     room, host_id = _create_room(isolated_manager)
     guest_ids = [_join_room(isolated_manager, room.code, display_name=f"P{i}")[1] for i in range(3)]
@@ -282,6 +384,106 @@ def test_cast_vote_before_game_started_returns_game_not_started(isolated_manager
 
     assert response["type"] == "error"
     assert response["code"] == "game_not_started"
+
+
+def test_terrorist_bomb_plant_and_withdraw_round_trip_over_websocket(isolated_manager):
+    room, host_id = _create_room(isolated_manager)
+    guest_ids = [_join_room(isolated_manager, room.code, display_name=f"P{i}")[1] for i in range(5)]
+    client = TestClient(app)
+
+    with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[0]}") as g0, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[1]}") as g1, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[2]}") as g2, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[3]}") as g3, \
+         client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[4]}") as g4:
+        sockets = {
+            host_id: host_socket,
+            guest_ids[0]: g0,
+            guest_ids[1]: g1,
+            guest_ids[2]: g2,
+            guest_ids[3]: g3,
+            guest_ids[4]: g4,
+        }
+        all_ids = set(sockets)
+        _drain_connect_messages(host_socket, g0, g1, g2, g3, g4)
+
+        # 6 players + mafia_count=1 + terrorist (additive slot) leaves 4
+        # villagers, so mafia_alive=2 stays below town_alive=4 -- otherwise
+        # a living terrorist alone would put mafia at instant win-parity
+        # before anyone even dies. NO_KILL means mafia inaction never
+        # produces a random fallback death, so any deaths observed below can
+        # only come from the bomb.
+        host_socket.send_json(
+            {
+                "type": "start_game",
+                "mafia_count": 1,
+                "conflict_resolution": "no_kill",
+                "enabled_role_keys": ["terrorist"],
+            }
+        )
+        roles_by_player = {}
+        for player_id, socket in sockets.items():
+            role_event = socket.receive_json()  # role_assigned
+            roles_by_player[player_id] = role_event["role"]["key"]
+            socket.receive_json()  # room_state (night, round 1)
+        for socket in sockets.values():
+            socket.receive_json()  # night_timer_started
+
+        terrorist_id = next(pid for pid, key in roles_by_player.items() if key == "terrorist")
+        bomb_target = next(pid for pid in all_ids if pid != terrorist_id)
+
+        sockets[terrorist_id].send_json({"type": "night_action", "target_player_id": bomb_target})
+        # Planting produces no immediate feedback to the terrorist -- confirm
+        # by checking a ping's pong is the very next message.
+        sockets[terrorist_id].send_json({"type": "ping"})
+        assert sockets[terrorist_id].receive_json()["type"] == "pong"
+
+        host_socket.send_json({"type": "advance_phase"})  # NIGHT -> DAY, round 1
+        for pid, socket in sockets.items():
+            night_result = socket.receive_json()
+            assert night_result["eliminated_player_ids"] == []
+            if pid == terrorist_id:
+                bomb_status = socket.receive_json()
+                assert bomb_status["type"] == "terrorist_bomb_status"
+                assert bomb_status["pending"] is True
+                assert bomb_status["target_player_id"] == bomb_target
+            socket.receive_json()  # room_state
+
+        host_socket.send_json({"type": "advance_phase"})  # DAY -> VOTING
+        for socket in sockets.values():
+            socket.receive_json()  # room_state
+        host_socket.send_json({"type": "advance_phase"})  # VOTING -> ELIMINATION
+        for socket in sockets.values():
+            socket.receive_json()  # elimination_result
+            socket.receive_json()  # room_state
+        host_socket.send_json({"type": "advance_phase"})  # ELIMINATION -> NIGHT, round 2
+        for socket in sockets.values():
+            socket.receive_json()  # room_state
+            socket.receive_json()  # night_timer_started
+
+        # Withdraw the armed bomb before round 2's resolution.
+        sockets[terrorist_id].send_json({"type": "withdraw_bomb"})
+        sockets[terrorist_id].send_json({"type": "ping"})
+        assert sockets[terrorist_id].receive_json()["type"] == "pong"
+
+        host_socket.send_json({"type": "advance_phase"})  # NIGHT -> DAY, round 2
+        for pid, socket in sockets.items():
+            night_result = socket.receive_json()
+            assert night_result["eliminated_player_ids"] == []
+            if pid == terrorist_id:
+                bomb_status = socket.receive_json()
+                assert bomb_status["type"] == "terrorist_bomb_status"
+                assert bomb_status["pending"] is False
+                assert bomb_status["target_player_id"] is None
+            socket.receive_json()  # room_state
+
+        # The bomb-status event is private -- no other socket ever saw it.
+        for pid, socket in sockets.items():
+            if pid == terrorist_id:
+                continue
+            socket.send_json({"type": "ping"})
+            assert socket.receive_json()["type"] == "pong"
 
 
 def test_night_action_wrong_phase_returns_invalid_game_state(isolated_manager):

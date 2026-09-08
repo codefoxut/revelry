@@ -154,6 +154,54 @@ describe("roomStore", () => {
     ]);
   });
 
+  it("stores the list of eliminated player ids on night_result", () => {
+    captured!.onEvent({ type: "night_result", eliminated_player_ids: ["p1", "p2"] });
+
+    expect(useRoomStore.getState().nightResult).toEqual({ eliminatedPlayerIds: ["p1", "p2"] });
+  });
+
+  it("accumulates mayor_revealed player ids and does not duplicate a repeat reveal", () => {
+    captured!.onEvent({ type: "mayor_revealed", player_id: "p1" });
+    captured!.onEvent({ type: "mayor_revealed", player_id: "p1" });
+
+    expect(useRoomStore.getState().revealedMayorIds).toEqual(["p1"]);
+  });
+
+  it("keeps revealedMayorIds across a new night's room_state reset", () => {
+    captured!.onEvent({ type: "mayor_revealed", player_id: "p1" });
+
+    captured!.onEvent({
+      type: "room_state",
+      room: baseRoom({ phase: "in_game", game_state: { phase: "night", round_number: 2, alive_player_ids: ["p1", "p2"] } }),
+    });
+
+    expect(useRoomStore.getState().revealedMayorIds).toEqual(["p1"]);
+  });
+
+  it("sets terroristBomb pending state with the target id on terrorist_bomb_status", () => {
+    captured!.onEvent({ type: "terrorist_bomb_status", pending: true, target_player_id: "p2" });
+
+    expect(useRoomStore.getState().terroristBomb).toEqual({ pending: true, targetPlayerId: "p2" });
+  });
+
+  it("clears the bomb target on a later terrorist_bomb_status with pending false", () => {
+    captured!.onEvent({ type: "terrorist_bomb_status", pending: true, target_player_id: "p2" });
+    captured!.onEvent({ type: "terrorist_bomb_status", pending: false, target_player_id: null });
+
+    expect(useRoomStore.getState().terroristBomb).toEqual({ pending: false, targetPlayerId: null });
+  });
+
+  it("keeps terroristBomb across a new night's room_state reset", () => {
+    captured!.onEvent({ type: "terrorist_bomb_status", pending: true, target_player_id: "p2" });
+
+    captured!.onEvent({
+      type: "room_state",
+      room: baseRoom({ phase: "in_game", game_state: { phase: "night", round_number: 2, alive_player_ids: ["p1", "p2"] } }),
+    });
+
+    expect(useRoomStore.getState().terroristBomb).toEqual({ pending: true, targetPlayerId: "p2" });
+  });
+
   it("keeps nightTimer when room_state reports the night phase", () => {
     captured!.onEvent({ type: "night_timer_started", duration_seconds: 60 });
     const scheduled = useRoomStore.getState().nightTimer;

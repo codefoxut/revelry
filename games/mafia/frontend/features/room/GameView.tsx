@@ -19,6 +19,8 @@ export function GameView() {
   const votes = useRoomStore((state) => state.votes);
   const mafiaPicks = useRoomStore((state) => state.mafiaPicks);
   const nightTimer = useRoomStore((state) => state.nightTimer);
+  const revealedMayorIds = useRoomStore((state) => state.revealedMayorIds);
+  const terroristBomb = useRoomStore((state) => state.terroristBomb);
   const sendCommand = useRoomStore((state) => state.sendCommand);
 
   const phase = room?.game_state?.phase;
@@ -31,13 +33,20 @@ export function GameView() {
   const aliveIds = new Set(room.game_state.alive_player_ids);
   const selfAlive = selfPlayerId ? aliveIds.has(selfPlayerId) : false;
   const alivePlayers = room.players.filter((player) => aliveIds.has(player.id));
-  const nightActionTargets =
-    myRole?.key === "mafia" || myRole?.key === "detective"
-      ? alivePlayers.filter((player) => player.id !== selfPlayerId)
-      : alivePlayers;
+  const nightActionTargets = myRole && !myRole.allow_self_target
+    ? alivePlayers.filter((player) => player.id !== selfPlayerId)
+    : alivePlayers;
+  const isMayor = myRole?.key === "mayor";
+  const mayorAlreadyRevealed = selfPlayerId ? revealedMayorIds.includes(selfPlayerId) : false;
+  const isTerrorist = myRole?.key === "terrorist";
+  const bombPending = isTerrorist && (terroristBomb?.pending ?? false);
 
   function submitNightAction(targetId: string) {
     sendCommand({ type: "night_action", target_player_id: targetId });
+  }
+
+  function withdrawBomb() {
+    sendCommand({ type: "withdraw_bomb" });
   }
 
   function submitVote(targetId: string) {
@@ -46,6 +55,10 @@ export function GameView() {
 
   function lockNightAction() {
     sendCommand({ type: "lock_night_action" });
+  }
+
+  function revealMayor() {
+    sendCommand({ type: "reveal_mayor" });
   }
 
   function advancePhase() {
@@ -126,8 +139,10 @@ export function GameView() {
 
         {nightResult && (phase === "day" || phase === "voting" || phase === "elimination") && (
           <p className="text-center text-sm text-zinc-400">
-            {nightResult.eliminatedPlayerId
-              ? `${playerName(room.players, nightResult.eliminatedPlayerId)} was killed overnight.`
+            {nightResult.eliminatedPlayerIds.length > 0
+              ? `${nightResult.eliminatedPlayerIds
+                  .map((id) => playerName(room.players, id))
+                  .join(", ")} ${nightResult.eliminatedPlayerIds.length > 1 ? "were" : "was"} killed overnight.`
               : "No one was killed overnight."}
           </p>
         )}
@@ -140,7 +155,25 @@ export function GameView() {
           </p>
         )}
 
-        {phase === "night" && selfAlive && myRole?.acts_at_night && (
+        {phase === "night" && selfAlive && isTerrorist && bombPending && terroristBomb?.targetPlayerId && (
+          <div className="flex w-full flex-col items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+            <span className="text-center text-sm text-zinc-300">
+              Bomb planted on{" "}
+              <span className="font-medium text-rose-400">
+                {playerName(room.players, terroristBomb.targetPlayerId)}
+              </span>{" "}
+              — detonates tonight unless withdrawn.
+            </span>
+            <button
+              type="button"
+              onClick={withdrawBomb}
+              className="h-10 rounded-full border border-rose-500 px-6 font-medium text-rose-400 transition-colors hover:bg-rose-950/50"
+            >
+              Withdraw bomb
+            </button>
+          </div>
+        )}
+        {phase === "night" && selfAlive && myRole?.acts_at_night && !bombPending && (
           <TargetPicker
             key={`night-${roundNumber}`}
             label="Choose your target"
@@ -148,7 +181,7 @@ export function GameView() {
             onSelect={submitNightAction}
           />
         )}
-        {phase === "night" && selfAlive && myRole?.team === "mafia" && (
+        {phase === "night" && selfAlive && myRole?.team === "mafia" && !isTerrorist && (
           <MafiaTeamPanel
             key={`mafia-${roundNumber}`}
             players={room.players}
@@ -167,6 +200,21 @@ export function GameView() {
         )}
         {phase === "night" && !selfAlive && (
           <p className="text-center text-sm text-zinc-600">You&rsquo;re out, but you can keep watching.</p>
+        )}
+
+        {(phase === "day" || phase === "voting") && selfAlive && isMayor && !mayorAlreadyRevealed && (
+          <button
+            type="button"
+            onClick={revealMayor}
+            className="h-10 rounded-full border border-rose-500 px-6 font-medium text-rose-400 transition-colors hover:bg-rose-950/50"
+          >
+            Reveal as Mayor (doubles your vote)
+          </button>
+        )}
+        {(phase === "day" || phase === "voting") && selfAlive && isMayor && mayorAlreadyRevealed && (
+          <p className="text-center text-sm text-zinc-500">
+            You have revealed as Mayor — your vote counts double.
+          </p>
         )}
 
         {phase === "voting" && selfAlive && (

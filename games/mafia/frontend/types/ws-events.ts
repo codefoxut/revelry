@@ -34,6 +34,7 @@ export interface RoleOut {
   team: string;
   description: string;
   acts_at_night: boolean;
+  allow_self_target: boolean;
 }
 
 export interface RoleAssignedEvent {
@@ -49,7 +50,7 @@ export interface InvestigationResultEvent {
 
 export interface NightResultEvent {
   type: "night_result";
-  eliminated_player_id: string | null;
+  eliminated_player_ids: string[];
 }
 
 export interface EliminationResultEvent {
@@ -92,6 +93,17 @@ export interface NightTimerStartedEvent {
   duration_seconds: number;
 }
 
+export interface MayorRevealedEvent {
+  type: "mayor_revealed";
+  player_id: string;
+}
+
+export interface TerroristBombStatusEvent {
+  type: "terrorist_bomb_status";
+  pending: boolean;
+  target_player_id: string | null;
+}
+
 export type ServerEvent =
   | RoomStateEvent
   | PlayerConnectionChangedEvent
@@ -105,7 +117,9 @@ export type ServerEvent =
   | GameOverEvent
   | VoteCastEvent
   | MafiaNightPicksEvent
-  | NightTimerStartedEvent;
+  | NightTimerStartedEvent
+  | MayorRevealedEvent
+  | TerroristBombStatusEvent;
 
 // ---- Client -> Server ----
 
@@ -136,6 +150,9 @@ export interface LeaveRoomCommand {
 export interface StartGameCommand {
   type: "start_game";
   conflict_resolution: "kill_any" | "no_kill";
+  day_tie_resolution: "no_elimination" | "random_among_tied";
+  mafia_count?: number | null;
+  enabled_role_keys?: string[] | null;
 }
 
 export interface AdvancePhaseCommand {
@@ -156,6 +173,14 @@ export interface LockNightActionCommand {
   type: "lock_night_action";
 }
 
+export interface RevealMayorCommand {
+  type: "reveal_mayor";
+}
+
+export interface WithdrawBombCommand {
+  type: "withdraw_bomb";
+}
+
 export type ClientCommand =
   | PingCommand
   | SetReadyCommand
@@ -166,4 +191,6 @@ export type ClientCommand =
   | AdvancePhaseCommand
   | NightActionCommand
   | CastVoteCommand
-  | LockNightActionCommand;
+  | LockNightActionCommand
+  | RevealMayorCommand
+  | WithdrawBombCommand;

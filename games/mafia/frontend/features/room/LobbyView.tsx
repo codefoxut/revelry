@@ -8,11 +8,19 @@ import { GameView } from "./GameView";
 import { avatarEmoji } from "@/lib/avatars";
 import type { Player } from "@/types/room";
 import type { StartGameCommand } from "@/types/ws-events";
+import {
+  ROLE_CATALOG,
+  TOGGLEABLE_ROLE_KEYS,
+  DEFAULT_ENABLED_ROLE_KEYS,
+  clampMafiaCount,
+  totalRoleSlots,
+} from "@/lib/roles";
 
 // Mirrors MAFIA_MODULE.min_players in app/games/mafia/__init__.py.
 const MIN_PLAYERS_TO_START = 4;
 
 type ConflictResolution = StartGameCommand["conflict_resolution"];
+type DayTieResolution = StartGameCommand["day_tie_resolution"];
 
 export function LobbyView() {
   const router = useRouter();
@@ -25,6 +33,9 @@ export function LobbyView() {
   const disconnect = useRoomStore((state) => state.disconnect);
   const [copied, setCopied] = useState(false);
   const [conflictResolution, setConflictResolution] = useState<ConflictResolution>("kill_any");
+  const [dayTieResolution, setDayTieResolution] = useState<DayTieResolution>("no_elimination");
+  const [enabledRoleKeys, setEnabledRoleKeys] = useState<string[]>(DEFAULT_ENABLED_ROLE_KEYS);
+  const [mafiaCountInput, setMafiaCountInput] = useState<number | null>(null);
 
   if (kicked) {
     return (
@@ -66,8 +77,23 @@ export function LobbyView() {
     sendCommand({ type: "kick_player", target_player_id: targetId });
   }
 
+  function toggleRole(key: string) {
+    setEnabledRoleKeys((current) =>
+      current.includes(key) ? current.filter((k) => k !== key) : [...current, key]
+    );
+  }
+
+  const clampedMafiaCount = clampMafiaCount(Math.max(activePlayerCount, 1), mafiaCountInput);
+  const roleOverflow = totalRoleSlots(clampedMafiaCount, enabledRoleKeys) > activePlayerCount;
+
   function startGame() {
-    sendCommand({ type: "start_game", conflict_resolution: conflictResolution });
+    sendCommand({
+      type: "start_game",
+      conflict_resolution: conflictResolution,
+      day_tie_resolution: dayTieResolution,
+      mafia_count: mafiaCountInput,
+      enabled_role_keys: enabledRoleKeys,
+    });
   }
 
   function leave() {
@@ -165,40 +191,129 @@ export function LobbyView() {
         )}
 
         {!inGame && isHost && (
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-xs uppercase tracking-wide text-zinc-500">
-                If mafia can&rsquo;t agree
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex w-full flex-col gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+              <span className="text-center text-xs uppercase tracking-wide text-zinc-500">
+                Game settings
               </span>
-              <div className="flex overflow-hidden rounded-full border border-zinc-700">
-                <button
-                  type="button"
-                  onClick={() => setConflictResolution("kill_any")}
-                  className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                    conflictResolution === "kill_any"
-                      ? "bg-rose-500 text-white"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  Kill someone at random
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConflictResolution("no_kill")}
-                  className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                    conflictResolution === "no_kill"
-                      ? "bg-rose-500 text-white"
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  No one dies
-                </button>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-zinc-300">Optional roles</span>
+                <div className="flex flex-wrap gap-2">
+                  {ROLE_CATALOG.filter((role) => TOGGLEABLE_ROLE_KEYS.includes(role.key)).map((role) => {
+                    const enabled = enabledRoleKeys.includes(role.key);
+                    return (
+                      <button
+                        key={role.key}
+                        type="button"
+                        title={role.description}
+                        onClick={() => toggleRole(role.key)}
+                        className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                          enabled
+                            ? "border-rose-500 bg-rose-500 text-white"
+                            : "border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                        }`}
+                      >
+                        {role.display_name}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-zinc-300">Mafia count</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMafiaCountInput(Math.max(1, clampedMafiaCount - 1))}
+                    className="h-8 w-8 rounded-full border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+                  >
+                    −
+                  </button>
+                  <span className="w-4 text-center">{clampedMafiaCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => setMafiaCountInput(clampedMafiaCount + 1)}
+                    className="h-8 w-8 rounded-full border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xs uppercase tracking-wide text-zinc-500">
+                  If mafia can&rsquo;t agree
+                </span>
+                <div className="flex overflow-hidden rounded-full border border-zinc-700">
+                  <button
+                    type="button"
+                    onClick={() => setConflictResolution("kill_any")}
+                    className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                      conflictResolution === "kill_any"
+                        ? "bg-rose-500 text-white"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    Kill someone at random
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConflictResolution("no_kill")}
+                    className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                      conflictResolution === "no_kill"
+                        ? "bg-rose-500 text-white"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    No one dies
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xs uppercase tracking-wide text-zinc-500">
+                  If the day vote ties
+                </span>
+                <div className="flex overflow-hidden rounded-full border border-zinc-700">
+                  <button
+                    type="button"
+                    onClick={() => setDayTieResolution("no_elimination")}
+                    className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                      dayTieResolution === "no_elimination"
+                        ? "bg-rose-500 text-white"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    No one is eliminated
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDayTieResolution("random_among_tied")}
+                    className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                      dayTieResolution === "random_among_tied"
+                        ? "bg-rose-500 text-white"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    Randomly pick one of the tied
+                  </button>
+                </div>
+              </div>
+
+              {roleOverflow && (
+                <p className="text-center text-sm text-rose-400">
+                  Too many roles enabled for {activePlayerCount} players — turn some off or add more
+                  players.
+                </p>
+              )}
             </div>
+
             <button
               type="button"
               onClick={startGame}
-              disabled={activePlayerCount < MIN_PLAYERS_TO_START}
+              disabled={activePlayerCount < MIN_PLAYERS_TO_START || roleOverflow}
               className="h-12 rounded-full bg-rose-500 px-8 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Start game

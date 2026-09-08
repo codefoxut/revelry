@@ -300,7 +300,7 @@ def test_advance_phase_cycles_and_broadcasts(isolated_manager):
     assert night_result["type"] == "night_result"
     # No mafia locked a target, so the default KILL_ANY fallback kills a
     # random living player instead of no one — mafia included.
-    assert night_result["eliminated_player_id"] is not None
+    assert night_result["eliminated_player_ids"] != []
     game_state = update["room"]["game_state"]
     assert game_state["phase"] in {"day", "game_over"}
     assert game_state["round_number"] == 1

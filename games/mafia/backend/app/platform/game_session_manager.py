@@ -6,10 +6,13 @@ from app.games.mafia.commands import (
     AdvancePhaseCommand,
     CastVoteCommand,
     LockNightActionCommand,
+    RevealMayorCommand,
     StartGameCommand,
     SubmitNightActionCommand,
+    WithdrawBombCommand,
 )
 from app.games.mafia.conflict_resolution import ConflictResolution
+from app.games.mafia.day_tie_resolution import DayTieResolution
 from app.platform.exceptions import (
     GameAlreadyStartedError,
     GameNotStartedError,
@@ -43,6 +46,9 @@ class GameSessionManager:
         room_code: str,
         requester_id: str,
         conflict_resolution: ConflictResolution = ConflictResolution.KILL_ANY,
+        day_tie_resolution: DayTieResolution = DayTieResolution.NO_ELIMINATION,
+        mafia_count: int | None = None,
+        enabled_role_keys: frozenset[str] | None = None,
     ) -> tuple[Room, list[Event]]:
         room = await self._room_manager.require_room(room_code)
         if room.host_player_id != requester_id:
@@ -64,6 +70,9 @@ class GameSessionManager:
                 player_id=requester_id,
                 active_player_ids=active_player_ids,
                 conflict_resolution=conflict_resolution,
+                day_tie_resolution=day_tie_resolution,
+                mafia_count=mafia_count,
+                enabled_role_keys=enabled_role_keys,
             )
         )
         await self._engine_store.save(room_code, engine)
@@ -104,6 +113,20 @@ class GameSessionManager:
             raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
 
         return await engine.handle_command(CastVoteCommand(player_id=player_id, target_player_id=target_player_id))
+
+    async def reveal_mayor(self, room_code: str, player_id: str) -> list[Event]:
+        engine = await self._engine_store.get(room_code)
+        if engine is None:
+            raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
+
+        return await engine.handle_command(RevealMayorCommand(player_id=player_id))
+
+    async def withdraw_bomb(self, room_code: str, player_id: str) -> list[Event]:
+        engine = await self._engine_store.get(room_code)
+        if engine is None:
+            raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
+
+        return await engine.handle_command(WithdrawBombCommand(player_id=player_id))
 
     async def get_phase_snapshot(self, room_code: str) -> dict[str, object] | None:
         engine = await self._engine_store.get(room_code)
