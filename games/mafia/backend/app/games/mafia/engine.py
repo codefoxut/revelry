@@ -173,6 +173,15 @@ class MafiaGameEngine(GameEngine):
                     player_id=player_id, target_player_id=target_player_id, team=reported_team.value
                 )
             ]
+        if kind is NightActionKind.ORACLE_INVESTIGATE:
+            target_role = self._roles[target_player_id]
+            effective_team = target_role.investigate_as or target_role.team
+            reported_team = Team.MAFIA if effective_team is Team.MAFIA else Team.TOWN
+            return [
+                InvestigationResultEvent(
+                    player_id=player_id, target_player_id=target_player_id, team=reported_team.value
+                )
+            ]
         if kind is NightActionKind.VIGILANTE_KILL:
             if self._vigilante_uses_remaining.get(player_id, 0) <= 0:
                 raise InvalidGameStateError("No vigilante shots remaining")

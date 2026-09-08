@@ -32,6 +32,13 @@ export const ROLE_CATALOG: RoleInfo[] = [
     description: "Each night, investigate one player to learn which team they're on.",
   },
   {
+    key: "oracle",
+    display_name: "Oracle",
+    team: "town",
+    description:
+      "Each night, investigate one player to learn if they're mafia-aligned or not — a simpler, binary read than the detective's three-way team report.",
+  },
+  {
     key: "doctor",
     display_name: "Doctor",
     team: "town",
@@ -56,6 +63,12 @@ export const ROLE_CATALOG: RoleInfo[] = [
     display_name: "Escort",
     team: "town",
     description: "Each night, choose one player to distract — blocking whatever night action they attempt.",
+  },
+  {
+    key: "hypnotizer",
+    display_name: "Hypnotizer",
+    team: "town",
+    description: "Each night, choose one player to hypnotize — blocking whatever night action they attempt.",
   },
   {
     key: "godfather",
@@ -159,6 +172,13 @@ export function totalRoleSlots(mafiaCount: number, enabledRoleKeys: string[]): n
   return mafiaCount + specialCount;
 }
 
+// Role pairs that can never both be enabled at once. Mirrors
+// _MUTUALLY_EXCLUSIVE_ROLE_PAIRS in role_assignment.py.
+const MUTUALLY_EXCLUSIVE_ROLE_PAIRS: [string, string][] = [
+  ["detective", "oracle"],
+  ["escort", "hypnotizer"],
+];
+
 // Whether `roleKey` could be turned on (in addition to whatever's already
 // enabled) without breaking the game for this player/mafia count. Used to
 // grey out lobby role chips that wouldn't fit rather than letting the host
@@ -171,6 +191,11 @@ export function isRoleAvailable(
 ): boolean {
   const withRole = enabledRoleKeys.includes(roleKey) ? enabledRoleKeys : [...enabledRoleKeys, roleKey];
   if (totalRoleSlots(mafiaCount, withRole) > playerCount) return false;
+
+  for (const [a, b] of MUTUALLY_EXCLUSIVE_ROLE_PAIRS) {
+    if (roleKey === a && enabledRoleKeys.includes(b)) return false;
+    if (roleKey === b && enabledRoleKeys.includes(a)) return false;
+  }
 
   if (roleKey === "terrorist") {
     // Mirrors _check_win's mafia_alive >= town_alive parity rule in

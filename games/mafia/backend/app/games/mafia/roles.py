@@ -21,6 +21,7 @@ class NightActionKind(str, Enum):
     MAFIA_KILL = "mafia_kill"
     DOCTOR_PROTECT = "doctor_protect"
     DETECTIVE_INVESTIGATE = "detective_investigate"
+    ORACLE_INVESTIGATE = "oracle_investigate"
     BODYGUARD_PROTECT = "bodyguard_protect"
     VIGILANTE_KILL = "vigilante_kill"
     ESCORT_BLOCK = "escort_block"
@@ -77,6 +78,19 @@ DETECTIVE = Role(
     allow_self_target=False,
 )
 
+ORACLE = Role(
+    key="oracle",
+    display_name="Oracle",
+    team=Team.TOWN,
+    description=(
+        "Each night, investigate one player to learn if they're mafia-aligned or not — a "
+        "simpler, binary read than the detective's three-way team report."
+    ),
+    acts_at_night=True,
+    night_action_kind=NightActionKind.ORACLE_INVESTIGATE,
+    allow_self_target=False,
+)
+
 DOCTOR = Role(
     key="doctor",
     display_name="Doctor",
@@ -117,6 +131,16 @@ ESCORT = Role(
     display_name="Escort",
     team=Team.TOWN,
     description="Each night, choose one player to distract — blocking whatever night action they attempt.",
+    acts_at_night=True,
+    night_action_kind=NightActionKind.ESCORT_BLOCK,
+    allow_self_target=False,
+)
+
+HYPNOTIZER = Role(
+    key="hypnotizer",
+    display_name="Hypnotizer",
+    team=Team.TOWN,
+    description="Each night, choose one player to hypnotize — blocking whatever night action they attempt.",
     acts_at_night=True,
     night_action_kind=NightActionKind.ESCORT_BLOCK,
     allow_self_target=False,
@@ -201,10 +225,12 @@ ROLE_REGISTRY: dict[str, Role] = {
         VILLAGER,
         MAFIA_ROLE,
         DETECTIVE,
+        ORACLE,
         DOCTOR,
         BODYGUARD,
         VIGILANTE,
         ESCORT,
+        HYPNOTIZER,
         GODFATHER,
         MAYOR,
         JESTER,

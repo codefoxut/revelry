@@ -90,6 +90,16 @@ def test_build_composition_overflow_raises_instead_of_dropping_roles():
         build_composition(3, 1, frozenset({"detective", "doctor", "bodyguard"}))
 
 
+def test_build_composition_rejects_detective_and_oracle_together():
+    with pytest.raises(InvalidGameSettingsError):
+        build_composition(6, 1, frozenset({"detective", "oracle"}))
+
+
+def test_build_composition_rejects_escort_and_hypnotizer_together():
+    with pytest.raises(InvalidGameSettingsError):
+        build_composition(6, 1, frozenset({"escort", "hypnotizer"}))
+
+
 def test_build_composition_exact_fit_does_not_raise():
     roles = build_composition(3, 1, frozenset({"detective", "doctor"}))
     keys = sorted(role.key for role in roles)
@@ -114,6 +124,12 @@ def test_assign_roles_overflow_raises_invalid_game_settings_error():
             mafia_count=1,
             enabled_role_keys=frozenset({"detective", "doctor", "bodyguard"}),
         )
+
+
+def test_assign_roles_rejects_mutually_exclusive_roles():
+    players = [f"p{i}" for i in range(6)]
+    with pytest.raises(InvalidGameSettingsError):
+        assign_roles(players, random.Random(0), enabled_role_keys=frozenset({"escort", "hypnotizer"}))
 
 
 def test_build_composition_terrorist_adds_a_slot_not_replaces_a_mafia_slot():

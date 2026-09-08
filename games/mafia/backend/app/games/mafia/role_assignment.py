@@ -12,6 +12,16 @@ DEFAULT_ENABLED_ROLE_KEYS: frozenset[str] = frozenset({"detective", "doctor"})
 # like a plain Mafia member.
 _MAFIA_SUB_ROLE_KEYS: frozenset[str] = frozenset({"godfather"})
 
+# Role pairs that can never both be enabled at once. Escort/Hypnotizer is a
+# hard correctness requirement (they share NightActionKind.ESCORT_BLOCK, and
+# engine.py's _actor_id_for_kind assumes at most one living instance per
+# kind). Detective/Oracle is enforced for the same "exactly one investigator
+# role" reason even though they don't share a kind.
+MUTUALLY_EXCLUSIVE_ROLE_PAIRS: tuple[frozenset[str], ...] = (
+    frozenset({"detective", "oracle"}),
+    frozenset({"escort", "hypnotizer"}),
+)
+
 
 # player_count -> (min_mafia, max_mafia, default_mafia), curated for good
 # gameplay across the room's 4-20 player range (app/platform/room_manager.py).
@@ -51,6 +61,11 @@ def build_composition(player_count: int, mafia_count: int, enabled_role_keys: fr
     clamping villagers below zero — a hidden-information game must not
     silently omit a role the host explicitly enabled.
     """
+    for pair in MUTUALLY_EXCLUSIVE_ROLE_PAIRS:
+        if pair <= enabled_role_keys:
+            a, b = sorted(pair)
+            raise InvalidGameSettingsError(f"{a} and {b} cannot both be enabled in the same game")
+
     mafia_sub_keys = enabled_role_keys & _MAFIA_SUB_ROLE_KEYS
     special_keys = enabled_role_keys - _MAFIA_SUB_ROLE_KEYS - {"villager", "mafia"}
 

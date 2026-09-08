@@ -267,7 +267,7 @@ export function LobbyView() {
                             title={
                               available
                                 ? role.description
-                                : `${role.description} (doesn't fit with the current player/mafia count)`
+                                : `${role.description} (unavailable with the current settings)`
                             }
                             disabled={!available}
                             onClick={() => toggleRole(role.key)}

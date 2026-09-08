@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/lib/config";
+import type { GameInfo } from "@/types/game-info";
 import type { CreateRoomResponse, RoomSummary } from "@/types/room";
 
 async function parseOrThrow<T>(response: Response): Promise<T> {
@@ -30,4 +31,9 @@ export async function joinRoom(code: string, displayName: string, avatar = "defa
 export async function getRoomSummary(code: string): Promise<RoomSummary> {
   const response = await fetch(`${API_BASE_URL}/api/rooms/${code}`);
   return parseOrThrow<RoomSummary>(response);
+}
+
+export async function getGameInfo(): Promise<GameInfo> {
+  const response = await fetch(`${API_BASE_URL}/api/game-info`);
+  return parseOrThrow<GameInfo>(response);
 }

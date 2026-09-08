@@ -348,6 +348,17 @@ def test_detective_investigation_resolves_immediately():
     assert events == [InvestigationResultEvent(player_id="p3", target_player_id="p1", team="mafia")]
 
 
+def test_detective_investigates_serial_killer_as_neutral():
+    engine = MafiaGameEngine("DET02")
+    players = ["p1", "p2", "p3", "p4"]
+    _start(engine, players)
+    _force_roles(engine, {"p1": "serial_killer", "p2": "detective", "p3": "villager", "p4": "villager"})
+
+    events = _night_action(engine, "p2", "p1")
+
+    assert events == [InvestigationResultEvent(player_id="p2", target_player_id="p1", team="neutral")]
+
+
 def test_night_action_rejected_outside_night_phase():
     engine = _standard_engine()
     _advance(engine)  # -> DAY
@@ -646,6 +657,29 @@ def test_escort_blocking_the_doctor_lets_mafias_kill_through():
     _lock(engine, "p1")
     _night_action(engine, "p2", "p4")  # doctor tries to protect p4
     _night_action(engine, "p3", "p2")  # escort blocks the doctor
+
+    events = _advance(engine)
+
+    night_result = next(e for e in events if isinstance(e, NightResultEvent))
+    assert night_result.eliminated_player_ids == ["p4"]
+
+
+# ---- Hypnotizer ----
+
+
+def test_hypnotizer_blocking_the_doctor_lets_mafia_kill_through():
+    engine = MafiaGameEngine("HYP01")
+    players = ["p1", "p2", "p3", "p4", "p5"]
+    _start(engine, players)
+    _force_roles(
+        engine,
+        {"p1": "mafia", "p2": "doctor", "p3": "hypnotizer", "p4": "villager", "p5": "villager"},
+    )
+
+    _night_action(engine, "p1", "p4")
+    _lock(engine, "p1")
+    _night_action(engine, "p2", "p4")  # doctor tries to protect p4
+    _night_action(engine, "p3", "p2")  # hypnotizer blocks the doctor
 
     events = _advance(engine)
 
@@ -1068,3 +1102,41 @@ def test_detective_investigates_traitor_as_town():
     events = _night_action(engine, "p3", "p2")
 
     assert events == [InvestigationResultEvent(player_id="p3", target_player_id="p2", team="town")]
+
+
+# ---- Oracle ----
+
+
+def test_oracle_investigates_mafia_as_mafia():
+    engine = MafiaGameEngine("ORC01")
+    players = ["p1", "p2", "p3", "p4"]
+    _start(engine, players)
+    _force_roles(engine, {"p1": "mafia", "p2": "oracle", "p3": "villager", "p4": "villager"})
+
+    events = _night_action(engine, "p2", "p1")
+
+    assert events == [InvestigationResultEvent(player_id="p2", target_player_id="p1", team="mafia")]
+
+
+def test_oracle_collapses_neutral_target_to_town():
+    engine = MafiaGameEngine("ORC02")
+    players = ["p1", "p2", "p3", "p4"]
+    _start(engine, players)
+    _force_roles(engine, {"p1": "serial_killer", "p2": "oracle", "p3": "villager", "p4": "villager"})
+
+    events = _night_action(engine, "p2", "p1")
+
+    # Unlike Detective (see test_detective_investigates_serial_killer_as_neutral),
+    # Oracle only distinguishes mafia-aligned from everyone else.
+    assert events == [InvestigationResultEvent(player_id="p2", target_player_id="p1", team="town")]
+
+
+def test_oracle_investigates_godfather_as_town_via_existing_masking():
+    engine = MafiaGameEngine("ORC03")
+    players = ["p1", "p2", "p3", "p4"]
+    _start(engine, players)
+    _force_roles(engine, {"p1": "godfather", "p2": "oracle", "p3": "villager", "p4": "villager"})
+
+    events = _night_action(engine, "p2", "p1")
+
+    assert events == [InvestigationResultEvent(player_id="p2", target_player_id="p1", team="town")]
