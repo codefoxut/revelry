@@ -1,4 +1,4 @@
-.PHONY: run hub open mafia charades guess-the-personality pictionary heads-up emoji-charades name-that-tune spyfall codenames
+.PHONY: run hub open mafia charades guess-the-personality pictionary heads-up emoji-charades name-that-tune spyfall codenames trivia-showdown
 
 HUB_PORT ?= 4000
 MAFIA_FRONTEND_PORT ?= 3000
@@ -13,6 +13,8 @@ SPYFALL_FRONTEND_PORT ?= 3100
 SPYFALL_BACKEND_PORT ?= 8100
 CODENAMES_FRONTEND_PORT ?= 3200
 CODENAMES_BACKEND_PORT ?= 8200
+TRIVIA_SHOWDOWN_FRONTEND_PORT ?= 3300
+TRIVIA_SHOWDOWN_BACKEND_PORT ?= 8300
 
 URL := http://localhost:$(HUB_PORT)
 
@@ -21,14 +23,14 @@ URL := http://localhost:$(HUB_PORT)
 # in the background, opens it in your browser, then waits on it in the
 # foreground so Ctrl+C stops it.
 run:
-	@python3 hub.py --port $(HUB_PORT) --mafia-port $(MAFIA_FRONTEND_PORT) --charades-port $(CHARADES_PORT) --guess-the-personality-port $(GUESS_THE_PERSONALITY_PORT) --pictionary-port $(PICTIONARY_PORT) --heads-up-port $(HEADS_UP_PORT) --emoji-charades-port $(EMOJI_CHARADES_PORT) --name-that-tune-port $(NAME_THAT_TUNE_PORT) --spyfall-port $(SPYFALL_FRONTEND_PORT) --codenames-port $(CODENAMES_FRONTEND_PORT) & \
+	@python3 hub.py --port $(HUB_PORT) --mafia-port $(MAFIA_FRONTEND_PORT) --charades-port $(CHARADES_PORT) --guess-the-personality-port $(GUESS_THE_PERSONALITY_PORT) --pictionary-port $(PICTIONARY_PORT) --heads-up-port $(HEADS_UP_PORT) --emoji-charades-port $(EMOJI_CHARADES_PORT) --name-that-tune-port $(NAME_THAT_TUNE_PORT) --spyfall-port $(SPYFALL_FRONTEND_PORT) --codenames-port $(CODENAMES_FRONTEND_PORT) --trivia-showdown-port $(TRIVIA_SHOWDOWN_FRONTEND_PORT) & \
 	pid=$$!; \
 	sleep 1; \
 	command -v open >/dev/null 2>&1 && open "$(URL)" || xdg-open "$(URL)"; \
 	wait $$pid
 
 hub:
-	python3 hub.py --port $(HUB_PORT) --mafia-port $(MAFIA_FRONTEND_PORT) --charades-port $(CHARADES_PORT) --guess-the-personality-port $(GUESS_THE_PERSONALITY_PORT) --pictionary-port $(PICTIONARY_PORT) --heads-up-port $(HEADS_UP_PORT) --emoji-charades-port $(EMOJI_CHARADES_PORT) --name-that-tune-port $(NAME_THAT_TUNE_PORT) --spyfall-port $(SPYFALL_FRONTEND_PORT) --codenames-port $(CODENAMES_FRONTEND_PORT)
+	python3 hub.py --port $(HUB_PORT) --mafia-port $(MAFIA_FRONTEND_PORT) --charades-port $(CHARADES_PORT) --guess-the-personality-port $(GUESS_THE_PERSONALITY_PORT) --pictionary-port $(PICTIONARY_PORT) --heads-up-port $(HEADS_UP_PORT) --emoji-charades-port $(EMOJI_CHARADES_PORT) --name-that-tune-port $(NAME_THAT_TUNE_PORT) --spyfall-port $(SPYFALL_FRONTEND_PORT) --codenames-port $(CODENAMES_FRONTEND_PORT) --trivia-showdown-port $(TRIVIA_SHOWDOWN_FRONTEND_PORT)
 
 # Opens the hub page in your default browser. Run this from a second
 # terminal (or after backgrounding `make run`) once the hub is up.
@@ -66,3 +68,7 @@ spyfall:
 codenames:
 	$(MAKE) -C games/codenames install
 	$(MAKE) -C games/codenames dev FRONTEND_PORT=$(CODENAMES_FRONTEND_PORT) BACKEND_PORT=$(CODENAMES_BACKEND_PORT)
+
+trivia-showdown:
+	$(MAKE) -C games/trivia-showdown install
+	$(MAKE) -C games/trivia-showdown dev FRONTEND_PORT=$(TRIVIA_SHOWDOWN_FRONTEND_PORT) BACKEND_PORT=$(TRIVIA_SHOWDOWN_BACKEND_PORT)

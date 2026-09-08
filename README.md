@@ -25,7 +25,7 @@ Modern party games for friends, families, and teams.
 - [x] Mafia
 - [x] Pictionary
 - [x] Guess the Personality
-- [ ] Trivia
+- [x] Trivia
 - [ ] AI Host
 
 
@@ -42,8 +42,8 @@ Modern party games for friends, families, and teams.
 ✅ Name That Tune
 ✅ Spyfall
 ✅ Codenames
+✅ Trivia Showdown
 ⬜ Would You Rather
-⬜ Trivia
 ⬜ Two Truths and a Lie
 ⬜ Rapid Fire
 
@@ -195,4 +195,21 @@ make install && make dev
 
 Open http://localhost:3200 (backend runs on http://localhost:8200). See the
 [game's README](games/codenames/README.md) for the Docker-based alternative and full
+command list.
+
+### [Trivia Showdown](games/trivia-showdown/README.md)
+
+Real-time multiplayer buzz-in trivia — one host screen shows the questions while
+contestants race to buzz in from their own phones, with the host judging answers and a
+running leaderboard.
+
+From the repo root: `make trivia-showdown`. Or directly:
+
+```bash
+cd games/trivia-showdown
+make install && make dev
+```
+
+Open http://localhost:3300 (backend runs on http://localhost:8300). See the
+[game's README](games/trivia-showdown/README.md) for the Docker-based alternative and full
 command list.

@@ -10,7 +10,8 @@ Usage:
     python3 hub.py [--port 4000] [--mafia-port 3000] [--charades-port 8080] \
         [--guess-the-personality-port 8081] [--pictionary-port 9090] \
         [--heads-up-port 8082] [--emoji-charades-port 8083] \
-        [--name-that-tune-port 8084] [--spyfall-port 3100] [--codenames-port 3200]
+        [--name-that-tune-port 8084] [--spyfall-port 3100] [--codenames-port 3200] \
+        [--trivia-showdown-port 3300]
 """
 
 import argparse
@@ -33,6 +34,7 @@ def build_games(
     name_that_tune_port: int,
     spyfall_port: int,
     codenames_port: int,
+    trivia_showdown_port: int,
 ) -> list[dict]:
     return [
         {
@@ -97,6 +99,13 @@ def build_games(
             "url": f"http://localhost:{codenames_port}",
             "path": "games/codenames",
             "start": "cd games/codenames && make install && make dev",
+        },
+        {
+            "name": "Trivia Showdown",
+            "description": "Buzz-in trivia — one host screen, contestants race to answer from their phones.",
+            "url": f"http://localhost:{trivia_showdown_port}",
+            "path": "games/trivia-showdown",
+            "start": "cd games/trivia-showdown && make install && make dev",
         },
     ]
 
@@ -173,6 +182,9 @@ def main() -> None:
     parser.add_argument("--name-that-tune-port", type=int, default=8084, help="port Name That Tune runs on")
     parser.add_argument("--spyfall-port", type=int, default=3100, help="port Spyfall's frontend runs on")
     parser.add_argument("--codenames-port", type=int, default=3200, help="port Codenames' frontend runs on")
+    parser.add_argument(
+        "--trivia-showdown-port", type=int, default=3300, help="port Trivia Showdown's frontend runs on"
+    )
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), Handler)
@@ -186,6 +198,7 @@ def main() -> None:
         args.name_that_tune_port,
         args.spyfall_port,
         args.codenames_port,
+        args.trivia_showdown_port,
     )
     print(f"Revelry games hub running at http://localhost:{args.port}")
     try:

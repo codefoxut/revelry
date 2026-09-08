@@ -37,7 +37,7 @@ def isolated_manager():
 
 
 def _create_room(manager: RoomManager):
-    return asyncio.run(manager.create_room(game_type="codenames", host_display_name="Alice"))
+    return asyncio.run(manager.create_room(game_type="trivia_showdown", host_display_name="Alice"))
 
 
 def _join_room(manager: RoomManager, code: str, display_name: str = "Bob"):
@@ -138,12 +138,11 @@ def test_disconnect_during_active_game_is_not_removed(isolated_manager):
         with client.websocket_connect(f"/ws/{room.code}?player_id={host_id}") as host_socket:
             host_socket.receive_json()  # initial room_state
             host_socket.send_json({"type": "start_game"})
-            host_socket.receive_json()  # role_assigned
-            host_socket.receive_json()  # room_state: in_game/night
+            host_socket.receive_json()  # question_shown
+            host_socket.receive_json()  # room_state: in_game/question_open
 
             with client.websocket_connect(f"/ws/{room.code}?player_id={guest_ids[0]}") as guest_socket:
-                guest_socket.receive_json()  # own room_state
-                guest_socket.receive_json()  # own role_assigned (resent on connect)
+                guest_socket.receive_json()  # own room_state (includes current game_state)
                 host_socket.receive_json()  # presence: connected True
 
             host_socket.receive_json()  # presence: connected False
