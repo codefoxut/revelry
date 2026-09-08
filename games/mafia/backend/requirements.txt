@@ -8,5 +8,5 @@ greenlet>=3.1
 websockets>=13.0
 
 pytest>=8.3
-pytest-asyncio>=0.24
+pytest-asyncio>=1.4.0
 httpx2>=2.0
