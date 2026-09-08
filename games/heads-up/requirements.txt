@@ -1,0 +1,7 @@
+fastapi[all]
+anthropic
+uvicorn[standard]
+python-dotenv
+pytest>=8.3
+pytest-asyncio>=0.24
+httpx2>=2.0
