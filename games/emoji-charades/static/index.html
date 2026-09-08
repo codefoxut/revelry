@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>😀 Emoji Charades</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --hot-pink: #FF3E7F;
+    --orange: #FF8A3D;
+    --violet: #7B2FF7;
+    --ink: #14092B;
+    --deep-ink: #0A0518;
+    --panel: rgba(255, 255, 255, 0.06);
+    --panel-border: rgba(255, 255, 255, 0.12);
+    --text: #F4EEFF;
+    --muted: #B6A9D6;
+    --good: #33D17A;
+    --bad: #FF5C5C;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: "Baloo 2", "Poppins", "Segoe UI", system-ui, sans-serif;
+    background: var(--deep-ink);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background-image:
+      radial-gradient(ellipse 70% 45% at 50% 0%, rgba(255, 62, 127, 0.28) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 90%, rgba(123, 47, 247, 0.35) 0%, transparent 60%);
+    overflow-x: hidden;
+  }
+
+  .app { flex: 1; display: flex; flex-direction: column; max-width: 560px; margin: 0 auto; width: 100%; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
+  .screen { display: none; flex: 1; flex-direction: column; gap: 16px; animation: fade-in .25s ease; }
+  .screen.active { display: flex; }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  h1.title {
+    font-size: clamp(1.6rem, 6vw, 2.2rem);
+    text-align: center;
+    background: linear-gradient(90deg, var(--hot-pink), var(--orange));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+
+  .subtitle { text-align: center; color: var(--muted); font-size: 0.95rem; margin-top: -8px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 18px;
+    padding: 16px;
+  }
+
+  label { display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--panel-border);
+    background: rgba(0,0,0,0.25);
+    color: var(--text);
+    font-size: 1rem;
+    font-family: inherit;
+  }
+  input[type="text"]:focus { outline: 2px solid var(--hot-pink); }
+
+  .team-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .team-row input { flex: 1; }
+  .icon-btn {
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: var(--text);
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .icon-btn:active { transform: scale(0.94); }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    border-radius: 16px;
+    border: none;
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    color: white;
+    background: linear-gradient(90deg, var(--hot-pink), var(--violet));
+    box-shadow: 0 8px 24px rgba(255, 62, 127, 0.35);
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn.secondary { background: rgba(255,255,255,0.08); box-shadow: none; }
+  .btn.ghost { background: transparent; border: 1px solid var(--panel-border); box-shadow: none; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .category-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 6px;
+    border-radius: 14px;
+    border: 2px solid transparent;
+    background: rgba(255,255,255,0.05);
+    cursor: pointer;
+    font-size: 0.8rem;
+    text-align: center;
+  }
+  .category-chip .emoji { font-size: 1.6rem; }
+  .category-chip.selected { border-color: var(--orange); background: rgba(255, 138, 61, 0.15); }
+
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    padding: 8px 14px; border-radius: 999px; background: rgba(255,255,255,0.05);
+    border: 2px solid transparent; cursor: pointer; font-size: 0.9rem;
+  }
+  .pill.selected { border-color: var(--hot-pink); background: rgba(255,62,127,0.15); }
+
+  /* ── Turn / ready screen ─────────────────────────────────── */
+  .ready-screen { align-items: center; justify-content: center; text-align: center; gap: 24px; }
+  .team-banner {
+    font-size: clamp(1.8rem, 8vw, 2.6rem);
+    font-weight: 800;
+    color: var(--orange);
+  }
+  .ready-hint { color: var(--muted); max-width: 320px; margin: 0 auto; }
+
+  /* ── Reveal screen ────────────────────────────────────────── */
+  .reveal-screen { padding: 0; gap: 0; }
+  .reveal-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 12px; }
+  .turn-badge { color: var(--muted); font-size: 0.9rem; }
+  .steal-badge { color: var(--bad); font-weight: 800; font-size: 0.9rem; }
+
+  .clue-stage {
+    flex: 1;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    min-height: 260px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    background: linear-gradient(160deg, rgba(123,47,247,0.2), transparent 70%);
+    border: 2px solid rgba(123,47,247,0.4);
+  }
+  .clue-text { font-size: clamp(3rem, 18vw, 5rem); line-height: 1.2; }
+
+  .action-row { display: flex; gap: 12px; margin-top: 16px; }
+  .action-btn {
+    flex: 1;
+    padding: 20px 12px;
+    border-radius: 18px;
+    border: none;
+    font-size: 1.1rem;
+    font-weight: 800;
+    font-family: inherit;
+    color: white;
+    cursor: pointer;
+  }
+  .action-btn.pass { background: rgba(255, 92, 92, 0.25); border: 2px solid var(--bad); }
+  .action-btn.correct { background: rgba(51, 209, 122, 0.25); border: 2px solid var(--good); }
+  .action-btn:active { transform: scale(0.97); }
+
+  .reveal-answer { text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 12px; }
+
+  /* ── Scoreboard ───────────────────────────────────────────── */
+  .scoreboard { display: flex; flex-direction: column; gap: 8px; }
+  .score-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.04); }
+  .score-row .name { font-weight: 700; }
+  .score-row .score { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--orange); }
+  .score-row.leader { background: rgba(255, 138, 61, 0.15); border: 1px solid var(--orange); }
+
+  .trophy { text-align: center; font-size: 3rem; }
+
+  .error-banner {
+    background: rgba(255, 92, 92, 0.15);
+    border: 1px solid var(--bad);
+    color: #ffd7d7;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    display: none;
+  }
+  .error-banner.show { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SETUP ──────────────────────────────────────────────── -->
+  <section id="screen-setup" class="screen active">
+    <h1 class="title">😀 Emoji Charades</h1>
+    <p class="subtitle">Decode the emoji clue into a movie, show, or phrase before your team runs out of guesses.</p>
+    <div class="error-banner" id="setup-error"></div>
+
+    <div class="card">
+      <label>Teams</label>
+      <div id="team-rows"></div>
+      <button class="btn secondary" id="add-team-btn" type="button" style="margin-top:4px;">+ Add team</button>
+    </div>
+
+    <div class="card">
+      <label>Category</label>
+      <div class="category-grid" id="category-grid"></div>
+    </div>
+
+    <div class="card">
+      <label>Puzzle source</label>
+      <div class="pill-row" id="source-row">
+        <div class="pill selected" data-source="offline">📦 Offline puzzle bank</div>
+        <div class="pill" data-source="online" id="online-pill">✨ AI-generated</div>
+      </div>
+    </div>
+
+    <button class="btn" id="start-btn" type="button">Start Game</button>
+  </section>
+
+  <!-- ── READY / PASS ───────────────────────────────────────── -->
+  <section id="screen-ready" class="screen ready-screen">
+    <div>
+      <div class="subtitle" id="ready-subtitle">Up next</div>
+      <div class="team-banner" id="ready-team-name"></div>
+    </div>
+    <p class="ready-hint" id="ready-hint">Everyone looks at the screen together and shouts out guesses. Tap reveal when you're ready.</p>
+    <button class="btn" id="reveal-btn" type="button">Reveal Puzzle</button>
+    <button class="btn ghost" id="end-game-btn-ready" type="button">End Game</button>
+  </section>
+
+  <!-- ── REVEAL / GUESS ─────────────────────────────────────── -->
+  <section id="screen-reveal" class="screen reveal-screen">
+    <div class="reveal-header">
+      <span class="turn-badge" id="reveal-turn-badge"></span>
+      <span class="steal-badge" id="steal-badge" style="display:none;">STEAL!</span>
+    </div>
+    <div class="clue-stage">
+      <div class="clue-text" id="clue-text">…</div>
+    </div>
+    <div class="action-row">
+      <button class="action-btn pass" id="pass-btn" type="button">⏭ Pass</button>
+      <button class="action-btn correct" id="correct-btn" type="button">✅ Got it!</button>
+    </div>
+    <p class="reveal-answer" id="reveal-answer"></p>
+  </section>
+
+  <!-- ── SCOREBOARD (between turns) ─────────────────────────── -->
+  <section id="screen-scoreboard" class="screen">
+    <h1 class="title" style="font-size:1.6rem;" id="scoreboard-title">Nice!</h1>
+    <div class="card">
+      <label>Scoreboard</label>
+      <div class="scoreboard" id="turn-scoreboard"></div>
+    </div>
+    <button class="btn" id="next-turn-btn" type="button">Next Team's Turn</button>
+  </section>
+
+  <!-- ── GAME OVER ──────────────────────────────────────────── -->
+  <section id="screen-gameover" class="screen">
+    <div class="trophy">🏆</div>
+    <h1 class="title" id="winner-name">Final Scores</h1>
+    <div class="card">
+      <label>Final Scores</label>
+      <div class="scoreboard" id="final-scoreboard"></div>
+    </div>
+    <button class="btn" id="play-again-btn" type="button">Play Again</button>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const screens = ["setup", "ready", "reveal", "scoreboard", "gameover"];
+  function showScreen(name) {
+    for (const s of screens) $(`screen-${s}`).classList.toggle("active", s === name);
+  }
+
+  const sessionId = "emoji-charades-" + Math.random().toString(36).slice(2, 10);
+
+  let categories = [];
+  let selectedCategoryId = "mixed";
+  let selectedSource = "offline";
+  let onlineAvailable = false;
+
+  let gameState = null; // server session state
+  let isStealAttempt = false;
+
+  // ── Setup screen ──────────────────────────────────────────
+
+  function teamRowTemplate(index, value) {
+    const row = document.createElement("div");
+    row.className = "team-row";
+    row.innerHTML = `
+      <input type="text" placeholder="Team ${index + 1}" value="${value || ""}" />
+      <button class="icon-btn" type="button" aria-label="Remove team">✕</button>
+    `;
+    row.querySelector(".icon-btn").addEventListener("click", () => {
+      if (document.querySelectorAll("#team-rows .team-row").length > 2) row.remove();
+    });
+    return row;
+  }
+
+  function addTeamRow(value) {
+    const rows = $("team-rows");
+    if (rows.children.length >= 8) return;
+    rows.appendChild(teamRowTemplate(rows.children.length, value));
+  }
+
+  $("add-team-btn").addEventListener("click", () => addTeamRow());
+  addTeamRow("Red Team");
+  addTeamRow("Blue Team");
+
+  async function loadConfigAndCategories() {
+    const [configRes, categoriesRes] = await Promise.all([
+      fetch("/config"),
+      fetch("/categories"),
+    ]);
+    const config = await configRes.json();
+    onlineAvailable = !!config.online_mode_available;
+    if (!onlineAvailable) $("online-pill").style.display = "none";
+
+    categories = await categoriesRes.json();
+    const grid = $("category-grid");
+    grid.innerHTML = "";
+    for (const cat of categories) {
+      const chip = document.createElement("div");
+      chip.className = "category-chip" + (cat.id === selectedCategoryId ? " selected" : "");
+      chip.dataset.id = cat.id;
+      chip.innerHTML = `<span class="emoji">${cat.emoji}</span><span>${cat.name}</span>`;
+      chip.addEventListener("click", () => {
+        selectedCategoryId = cat.id;
+        grid.querySelectorAll(".category-chip").forEach((c) => c.classList.toggle("selected", c.dataset.id === cat.id));
+      });
+      grid.appendChild(chip);
+    }
+  }
+
+  $("source-row").addEventListener("click", (e) => {
+    const pill = e.target.closest(".pill");
+    if (!pill || pill.style.display === "none") return;
+    if (pill.dataset.source === "online" && !onlineAvailable) return;
+    selectedSource = pill.dataset.source;
+    document.querySelectorAll("#source-row .pill").forEach((p) => p.classList.toggle("selected", p === pill));
+  });
+
+  function showSetupError(message) {
+    const el = $("setup-error");
+    el.textContent = message;
+    el.classList.add("show");
+  }
+
+  $("start-btn").addEventListener("click", async () => {
+    const teamInputs = document.querySelectorAll("#team-rows input");
+    const teams = Array.from(teamInputs).map((i) => i.value.trim()).filter(Boolean);
+    if (teams.length < 2) return showSetupError("Add at least 2 teams.");
+
+    const res = await fetch("/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        teams,
+        category: selectedCategoryId,
+        source: selectedSource,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return showSetupError(err.detail || "Could not start the game.");
+    }
+    gameState = await res.json();
+    goToReadyScreen();
+  });
+
+  // ── Ready screen ──────────────────────────────────────────
+
+  function currentTeam() {
+    return gameState.teams[gameState.turn_index];
+  }
+
+  function nextTeam() {
+    const nextIndex = (gameState.turn_index + 1) % gameState.teams.length;
+    return gameState.teams[nextIndex];
+  }
+
+  function goToReadyScreen() {
+    isStealAttempt = gameState.pending_steal;
+    if (isStealAttempt) {
+      $("ready-subtitle").textContent = "Steal chance for";
+      $("ready-team-name").textContent = currentTeam().name;
+      $("ready-hint").textContent = "The other team passed — steal it and take the point!";
+    } else {
+      $("ready-subtitle").textContent = "Up next";
+      $("ready-team-name").textContent = currentTeam().name;
+      $("ready-hint").textContent = "Everyone looks at the screen together and shouts out guesses. Tap reveal when you're ready.";
+    }
+    showScreen("ready");
+  }
+
+  $("end-game-btn-ready").addEventListener("click", () => {
+    if (confirm("End the game now?")) showGameOver();
+  });
+
+  $("reveal-btn").addEventListener("click", async () => {
+    if (isStealAttempt) {
+      $("clue-text").textContent = gameState.current ? gameState.current.clue : "…";
+      $("reveal-answer").textContent = "";
+      $("steal-badge").style.display = "inline";
+      $("reveal-turn-badge").textContent = `${currentTeam().name} is stealing`;
+      showScreen("reveal");
+      return;
+    }
+    $("reveal-btn").disabled = true;
+    try {
+      const res = await fetch(`/reveal/${sessionId}`, { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || "Could not reveal a puzzle.");
+        return;
+      }
+      gameState = await res.json();
+      $("steal-badge").style.display = "none";
+      $("reveal-turn-badge").textContent = `${currentTeam().name}'s turn`;
+      $("clue-text").textContent = gameState.current.clue;
+      $("reveal-answer").textContent = "";
+      showScreen("reveal");
+    } finally {
+      $("reveal-btn").disabled = false;
+    }
+  });
+
+  // ── Reveal / guess screen ─────────────────────────────────
+
+  async function resolve(result) {
+    $("reveal-answer").textContent = gameState.current ? `Answer: ${gameState.current.answer}` : "";
+    const res = await fetch(`/resolve/${sessionId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ result }),
+    });
+    gameState = await res.json();
+
+    if (gameState.pending_steal) {
+      // Show the answer briefly, then hand it to the next team as a steal.
+      $("scoreboard-title").textContent = "Passed! Steal chance up next.";
+      renderScoreboard("turn-scoreboard", gameState.teams, gameState.scores);
+      showScreen("scoreboard");
+      return;
+    }
+    $("scoreboard-title").textContent = result.includes("correct") ? "Got it! 🎉" : "No steal — next team's turn.";
+    renderScoreboard("turn-scoreboard", gameState.teams, gameState.scores);
+    showScreen("scoreboard");
+  }
+
+  $("correct-btn").addEventListener("click", () => resolve(isStealAttempt ? "steal_correct" : "correct"));
+  $("pass-btn").addEventListener("click", () => resolve(isStealAttempt ? "steal_missed" : "pass"));
+
+  // ── Scoreboard between turns ──────────────────────────────
+
+  function renderScoreboard(elementId, teams, scores, highlightLeader) {
+    const el = $(elementId);
+    el.innerHTML = "";
+    const maxScore = Math.max(...Object.values(scores));
+    const sorted = teams.slice().sort((a, b) => scores[b.id] - scores[a.id]);
+    for (const team of sorted) {
+      const row = document.createElement("div");
+      const isLeader = highlightLeader && scores[team.id] === maxScore;
+      row.className = "score-row" + (isLeader ? " leader" : "");
+      row.innerHTML = `<span class="name">${isLeader ? "👑 " : ""}${team.name}</span><span class="score">${scores[team.id]}</span>`;
+      el.appendChild(row);
+    }
+  }
+
+  $("next-turn-btn").addEventListener("click", () => goToReadyScreen());
+
+  // ── Game over ─────────────────────────────────────────────
+
+  function showGameOver() {
+    const winnerId = Object.keys(gameState.scores).reduce((a, b) => (gameState.scores[a] >= gameState.scores[b] ? a : b));
+    const winner = gameState.teams.find((t) => t.id === winnerId);
+    $("winner-name").textContent = `${winner.name} wins! 🎉`;
+    renderScoreboard("final-scoreboard", gameState.teams, gameState.scores, true);
+    showScreen("gameover");
+  }
+
+  $("play-again-btn").addEventListener("click", () => {
+    fetch(`/reset/${sessionId}`, { method: "POST" }).finally(() => {
+      showScreen("setup");
+    });
+  });
+
+  loadConfigAndCategories();
+})();
+</script>
+</body>
+</html>
