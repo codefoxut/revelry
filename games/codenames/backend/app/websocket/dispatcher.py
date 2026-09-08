@@ -1,32 +1,27 @@
 from __future__ import annotations
 
-from app.games.spyfall.events import GameOverEvent as EngineGameOverEvent
-from app.games.spyfall.events import PlayerRoleReveal as EnginePlayerRoleReveal
-from app.games.spyfall.events import RoleAssignedEvent as EngineRoleAssignedEvent
-from app.games.spyfall.locations import LOCATION_REGISTRY
-from app.games.spyfall.phases import SpyfallPhase
+from app.games.codenames.events import CardRevealedEvent as EngineCardRevealedEvent
+from app.games.codenames.events import ClueGivenEvent as EngineClueGivenEvent
+from app.games.codenames.events import GameOverEvent as EngineGameOverEvent
 from app.platform.exceptions import (
     GameAlreadyStartedError,
     GameNotStartedError,
-    InvalidGameSettingsError,
     InvalidGameStateError,
     NotEnoughPlayersError,
     PermissionDeniedError,
     PlayerNotFoundError,
-    RoomNotFoundError,
 )
 from app.platform.game_session_manager import GameSessionManager
-from app.platform.night_timer import NightTimerManager
 from app.platform.room_manager import RoomManager
 from app.schemas.ws_events import (
-    DiscussionTimerStartedEvent,
+    CardRevealedEvent,
+    ClueGivenEvent,
     ErrorEvent,
     GameOverEvent,
     KickedEvent,
-    PlayerRoleRevealOut,
     PongEvent,
-    RoleAssignedEvent,
-    VoteCastEvent,
+    SpymasterViewEvent,
+    TeamAssignedEvent,
 )
 from app.services.room_presenter import broadcast_room_state
 from app.websocket.connection_manager import ConnectionManager
@@ -34,7 +29,8 @@ from app.websocket.connection_manager import ConnectionManager
 # Close code used when a host kicks another player from the room.
 _CLOSE_KICKED = 4403
 
-_LOCATION_KEY_VALUES = set(LOCATION_REGISTRY.keys())
+_MIN_CLUE_NUMBER = 0
+_MAX_CLUE_NUMBER = 9
 
 
 async def dispatch_client_event(
@@ -45,7 +41,6 @@ async def dispatch_client_event(
     room_manager: RoomManager,
     connection_manager: ConnectionManager,
     game_session_manager: GameSessionManager,
-    night_timer_manager: NightTimerManager,
 ) -> bool:
     """Route one parsed client message to its handler.
 
@@ -78,25 +73,19 @@ async def dispatch_client_event(
         return True
 
     if event_type == "start_game":
-        await _handle_start_game(
-            raw_event, room_code, player_id, room_manager, game_session_manager, connection_manager, night_timer_manager
-        )
+        await _handle_start_game(room_code, player_id, room_manager, game_session_manager, connection_manager)
         return False
 
-    if event_type == "advance_phase":
-        await _handle_advance_phase(
-            room_code, player_id, room_manager, game_session_manager, connection_manager, night_timer_manager
-        )
+    if event_type == "give_clue":
+        await _handle_give_clue(raw_event, room_code, player_id, room_manager, game_session_manager, connection_manager)
         return False
 
-    if event_type == "cast_vote":
-        await _handle_cast_vote(raw_event, room_code, player_id, game_session_manager, connection_manager)
+    if event_type == "make_guess":
+        await _handle_make_guess(raw_event, room_code, player_id, room_manager, game_session_manager, connection_manager)
         return False
 
-    if event_type == "guess_location":
-        await _handle_guess_location(
-            raw_event, room_code, player_id, room_manager, game_session_manager, connection_manager, night_timer_manager
-        )
+    if event_type == "end_turn":
+        await _handle_end_turn(room_code, player_id, room_manager, game_session_manager, connection_manager)
         return False
 
     await _send_error(connection_manager, room_code, player_id, "unknown_event", f"Unrecognized event type: {event_type!r}")
@@ -192,34 +181,14 @@ async def _handle_leave_room(
 
 
 async def _handle_start_game(
-    raw_event: dict,
     room_code: str,
     player_id: str,
     room_manager: RoomManager,
     game_session_manager: GameSessionManager,
     connection_manager: ConnectionManager,
-    night_timer_manager: NightTimerManager,
 ) -> None:
-    enabled_location_keys_raw = raw_event.get("enabled_location_keys")
-    if enabled_location_keys_raw is not None:
-        if not isinstance(enabled_location_keys_raw, list) or not all(
-            key in _LOCATION_KEY_VALUES for key in enabled_location_keys_raw
-        ):
-            await _send_error(
-                connection_manager,
-                room_code,
-                player_id,
-                "invalid_payload",
-                f"`enabled_location_keys` must be a list from {sorted(_LOCATION_KEY_VALUES)}",
-            )
-            return
-
     try:
-        _, events = await game_session_manager.start_game(
-            room_code,
-            player_id,
-            frozenset(enabled_location_keys_raw) if enabled_location_keys_raw is not None else None,
-        )
+        _, events = await game_session_manager.start_game(room_code, player_id)
     except PermissionDeniedError as exc:
         await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
         return
@@ -229,91 +198,43 @@ async def _handle_start_game(
     except NotEnoughPlayersError as exc:
         await _send_error(connection_manager, room_code, player_id, "not_enough_players", str(exc))
         return
-    except InvalidGameSettingsError as exc:
-        await _send_error(connection_manager, room_code, player_id, "invalid_game_settings", str(exc))
-        return
 
     for event in events:
-        if isinstance(event, EngineRoleAssignedEvent):
-            await connection_manager.send_to_player(room_code, event.player_id, _to_ws_role_assigned(event))
+        await send_private_assignment(room_code, event.player_id, game_session_manager, connection_manager)
 
     await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
-    await _sync_discussion_timer(room_code, room_manager, connection_manager, game_session_manager, night_timer_manager)
 
 
-async def _handle_advance_phase(
-    room_code: str,
-    player_id: str,
-    room_manager: RoomManager,
-    game_session_manager: GameSessionManager,
-    connection_manager: ConnectionManager,
-    night_timer_manager: NightTimerManager,
-) -> None:
-    try:
-        events = await game_session_manager.advance_phase(room_code, player_id)
-    except PermissionDeniedError as exc:
-        await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
-        return
-    except GameNotStartedError as exc:
-        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
-        return
-    except InvalidGameStateError as exc:
-        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
-        return
-
-    await _broadcast_resolution_events(events, room_code, connection_manager)
-    await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
-    await _sync_discussion_timer(room_code, room_manager, connection_manager, game_session_manager, night_timer_manager)
-
-
-async def _handle_cast_vote(
-    raw_event: dict,
-    room_code: str,
-    player_id: str,
-    game_session_manager: GameSessionManager,
-    connection_manager: ConnectionManager,
-) -> None:
-    target_id = raw_event.get("target_player_id")
-    if not target_id:
-        await _send_error(connection_manager, room_code, player_id, "invalid_payload", "`target_player_id` is required")
-        return
-
-    try:
-        await game_session_manager.cast_vote(room_code, player_id, target_id)
-    except GameNotStartedError as exc:
-        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
-        return
-    except InvalidGameStateError as exc:
-        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
-        return
-
-    await connection_manager.broadcast(room_code, VoteCastEvent(player_id=player_id, target_player_id=target_id))
-
-
-async def _handle_guess_location(
+async def _handle_give_clue(
     raw_event: dict,
     room_code: str,
     player_id: str,
     room_manager: RoomManager,
     game_session_manager: GameSessionManager,
     connection_manager: ConnectionManager,
-    night_timer_manager: NightTimerManager,
 ) -> None:
-    location_key = raw_event.get("location_key")
-    if not location_key or location_key not in _LOCATION_KEY_VALUES:
+    word = raw_event.get("word")
+    number = raw_event.get("number")
+    if not isinstance(word, str) or not word.strip():
+        await _send_error(connection_manager, room_code, player_id, "invalid_payload", "`word` is required")
+        return
+    if not isinstance(number, int) or isinstance(number, bool) or not (_MIN_CLUE_NUMBER <= number <= _MAX_CLUE_NUMBER):
         await _send_error(
             connection_manager,
             room_code,
             player_id,
             "invalid_payload",
-            f"`location_key` must be one of {sorted(_LOCATION_KEY_VALUES)}",
+            f"`number` must be an integer between {_MIN_CLUE_NUMBER} and {_MAX_CLUE_NUMBER}",
         )
         return
 
     try:
-        events = await game_session_manager.guess_location(room_code, player_id, location_key)
+        events = await game_session_manager.give_clue(room_code, player_id, word, number)
     except GameNotStartedError as exc:
         await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except PermissionDeniedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
         return
     except InvalidGameStateError as exc:
         await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
@@ -321,83 +242,107 @@ async def _handle_guess_location(
 
     await _broadcast_resolution_events(events, room_code, connection_manager)
     await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
-    await _sync_discussion_timer(room_code, room_manager, connection_manager, game_session_manager, night_timer_manager)
 
 
-async def _broadcast_resolution_events(events: list, room_code: str, connection_manager: ConnectionManager) -> None:
-    for event in events:
-        if isinstance(event, EngineGameOverEvent):
-            await connection_manager.broadcast(room_code, _to_ws_game_over(event))
-
-
-async def _sync_discussion_timer(
+async def _handle_make_guess(
+    raw_event: dict,
     room_code: str,
+    player_id: str,
     room_manager: RoomManager,
-    connection_manager: ConnectionManager,
     game_session_manager: GameSessionManager,
-    night_timer_manager: NightTimerManager,
-) -> None:
-    """Always cancels any pending timer for this room first, then reschedules
-    one iff the game is currently sitting in DISCUSSION — called after every
-    start_game/advance_phase/guess_location (manual or timer-fired), so it's
-    idempotent and safe regardless of call ordering.
-    """
-    night_timer_manager.cancel(room_code)
-
-    snapshot = await game_session_manager.get_phase_snapshot(room_code)
-    if snapshot is None or snapshot.get("phase") != SpyfallPhase.DISCUSSION.value:
-        return
-
-    async def _on_timer_expired() -> None:
-        await _auto_advance_phase(room_code, room_manager, connection_manager, game_session_manager, night_timer_manager)
-
-    night_timer_manager.schedule(room_code, _on_timer_expired)
-    await connection_manager.broadcast(
-        room_code, DiscussionTimerStartedEvent(duration_seconds=night_timer_manager.duration_seconds)
-    )
-
-
-async def _auto_advance_phase(
-    room_code: str,
-    room_manager: RoomManager,
     connection_manager: ConnectionManager,
-    game_session_manager: GameSessionManager,
-    night_timer_manager: NightTimerManager,
 ) -> None:
-    """Timer-fired equivalent of a host clicking "Advance phase" — moves
-    discussion into voting once the decision window runs out."""
-    room = await room_manager.get_room(room_code)
-    if room is None:
+    card_index = raw_event.get("card_index")
+    if not isinstance(card_index, int) or isinstance(card_index, bool):
+        await _send_error(connection_manager, room_code, player_id, "invalid_payload", "`card_index` must be an integer")
         return
 
     try:
-        events = await game_session_manager.advance_phase(room_code, room.host_player_id)
-    except (PermissionDeniedError, GameNotStartedError, InvalidGameStateError, RoomNotFoundError):
-        # The room may have moved on already (e.g. the host manually
-        # advanced right as the timer fired) — a stale timer is a no-op.
+        events = await game_session_manager.make_guess(room_code, player_id, card_index)
+    except GameNotStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except PermissionDeniedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
+        return
+    except InvalidGameStateError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
         return
 
     await _broadcast_resolution_events(events, room_code, connection_manager)
     await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
-    await _sync_discussion_timer(room_code, room_manager, connection_manager, game_session_manager, night_timer_manager)
 
 
-def _to_ws_role_assigned(event: EngineRoleAssignedEvent) -> RoleAssignedEvent:
-    return RoleAssignedEvent(is_spy=event.is_spy, location=event.location, role=event.role)
+async def _handle_end_turn(
+    room_code: str,
+    player_id: str,
+    room_manager: RoomManager,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+) -> None:
+    try:
+        events = await game_session_manager.end_turn(room_code, player_id)
+    except GameNotStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except PermissionDeniedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
+        return
+    except InvalidGameStateError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
+        return
+
+    await _broadcast_resolution_events(events, room_code, connection_manager)
+    await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
-def _to_ws_game_over(event: EngineGameOverEvent) -> GameOverEvent:
-    return GameOverEvent(
-        winning_side=event.winning_side,
-        location=event.location,
-        spy_player_ids=event.spy_player_ids,
-        accused_player_id=event.accused_player_id,
-        reveals=[_to_ws_reveal(reveal) for reveal in event.reveals],
+async def _broadcast_resolution_events(events: list, room_code: str, connection_manager: ConnectionManager) -> None:
+    for event in events:
+        if isinstance(event, EngineClueGivenEvent):
+            await connection_manager.broadcast(
+                room_code, ClueGivenEvent(team=event.team.value, word=event.word, number=event.number)
+            )
+        elif isinstance(event, EngineCardRevealedEvent):
+            await connection_manager.broadcast(
+                room_code,
+                CardRevealedEvent(
+                    card_index=event.card_index,
+                    word=event.word,
+                    color=event.color.value,
+                    guessed_by=event.guessed_by,
+                ),
+            )
+        elif isinstance(event, EngineGameOverEvent):
+            await connection_manager.broadcast(
+                room_code,
+                GameOverEvent(
+                    winning_side=event.winning_side.value,
+                    reason=event.reason,
+                    colors=[color.value for color in event.colors],
+                ),
+            )
+
+
+async def send_private_assignment(
+    room_code: str,
+    player_id: str,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+) -> None:
+    """Resends a player's team/role (and, for spymasters, the full board
+    colors) — used both right after start_game and on reconnect, since a
+    fresh socket has no memory of what it was told before."""
+    assignment = await game_session_manager.get_team_assignment(room_code, player_id)
+    if assignment is None:
+        return
+    team, role = assignment
+    await connection_manager.send_to_player(
+        room_code, player_id, TeamAssignedEvent(team=team.value, role=role.value)
     )
 
-
-def _to_ws_reveal(reveal: EnginePlayerRoleReveal) -> PlayerRoleRevealOut:
-    return PlayerRoleRevealOut(player_id=reveal.player_id, is_spy=reveal.is_spy, role=reveal.role)
+    colors = await game_session_manager.get_spymaster_colors(room_code, player_id)
+    if colors is not None:
+        await connection_manager.send_to_player(room_code, player_id, SpymasterViewEvent(colors=colors))
 
 
 async def _send_error(

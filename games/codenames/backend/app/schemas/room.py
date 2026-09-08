@@ -24,6 +24,26 @@ class PlayerOut(BaseModel):
     connected: bool
 
 
+class BoardCardOut(BaseModel):
+    """One card's public view. `color` is null until `revealed` is true —
+    the board's colors are the one piece of state that's genuinely
+    per-role (spymaster vs. guesser) rather than per-phase, so the full
+    color list travels separately as a private event instead of living
+    here.
+    """
+
+    word: str
+    revealed: bool
+    color: str | None
+
+
+class CurrentClueOut(BaseModel):
+    word: str
+    number: int
+    guesses_made: int
+    max_guesses: int
+
+
 class GameStateOut(BaseModel):
     """Where the room's active game currently is. Absent while still in the
     lobby; every phase-driven game reports at least a phase name and a
@@ -32,7 +52,11 @@ class GameStateOut(BaseModel):
 
     phase: str
     round_number: int
-    alive_player_ids: list[str] = []
+    current_team: str | None = None
+    current_clue: CurrentClueOut | None = None
+    board: list[BoardCardOut] = []
+    red_remaining: int = 0
+    blue_remaining: int = 0
 
 
 class RoomOut(BaseModel):

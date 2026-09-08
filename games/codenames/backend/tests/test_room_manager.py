@@ -18,7 +18,7 @@ def manager() -> RoomManager:
 
 
 async def test_create_room_makes_host_the_only_player(manager: RoomManager):
-    room, host_id = await manager.create_room("spyfall", "Alice")
+    room, host_id = await manager.create_room("codenames", "Alice")
 
     assert len(room.code) == 5
     assert room.host_player_id == host_id
@@ -27,7 +27,7 @@ async def test_create_room_makes_host_the_only_player(manager: RoomManager):
 
 
 async def test_join_room_adds_player(manager: RoomManager):
-    room, _ = await manager.create_room("spyfall", "Alice")
+    room, _ = await manager.create_room("codenames", "Alice")
 
     room, player_id = await manager.join_room(room.code, "Bob")
 
@@ -42,7 +42,7 @@ async def test_join_unknown_room_raises(manager: RoomManager):
 
 
 async def test_join_full_room_raises(manager: RoomManager):
-    room, _ = await manager.create_room("spyfall", "Host")
+    room, _ = await manager.create_room("codenames", "Host")
     room.max_players = 1
 
     with pytest.raises(RoomFullError):
@@ -50,7 +50,7 @@ async def test_join_full_room_raises(manager: RoomManager):
 
 
 async def test_join_in_progress_game_forces_spectator(manager: RoomManager):
-    room, _ = await manager.create_room("spyfall", "Host")
+    room, _ = await manager.create_room("codenames", "Host")
     room.phase = RoomPhase.IN_GAME
 
     room, player_id = await manager.join_room(room.code, "Latecomer")
@@ -59,7 +59,7 @@ async def test_join_in_progress_game_forces_spectator(manager: RoomManager):
 
 
 async def test_leave_room_migrates_host(manager: RoomManager):
-    room, host_id = await manager.create_room("spyfall", "Alice")
+    room, host_id = await manager.create_room("codenames", "Alice")
     room, bob_id = await manager.join_room(room.code, "Bob")
 
     room = await manager.leave_room(room.code, host_id)
@@ -70,7 +70,7 @@ async def test_leave_room_migrates_host(manager: RoomManager):
 
 
 async def test_leave_room_deletes_empty_room(manager: RoomManager):
-    room, host_id = await manager.create_room("spyfall", "Alice")
+    room, host_id = await manager.create_room("codenames", "Alice")
 
     result = await manager.leave_room(room.code, host_id)
 
@@ -79,7 +79,7 @@ async def test_leave_room_deletes_empty_room(manager: RoomManager):
 
 
 async def test_kick_player_requires_host(manager: RoomManager):
-    room, host_id = await manager.create_room("spyfall", "Alice")
+    room, host_id = await manager.create_room("codenames", "Alice")
     room, bob_id = await manager.join_room(room.code, "Bob")
     room, carol_id = await manager.join_room(room.code, "Carol")
 
@@ -91,7 +91,7 @@ async def test_kick_player_requires_host(manager: RoomManager):
 
 
 async def test_host_cannot_kick_self(manager: RoomManager):
-    room, host_id = await manager.create_room("spyfall", "Alice")
+    room, host_id = await manager.create_room("codenames", "Alice")
 
     with pytest.raises(PermissionDeniedError):
         await manager.kick_player(room.code, host_id, host_id)
@@ -103,7 +103,7 @@ def test_build_invite_url_contains_code(manager: RoomManager):
 
 
 async def test_set_ready_toggles_player_state(manager: RoomManager):
-    room, host_id = await manager.create_room("spyfall", "Alice")
+    room, host_id = await manager.create_room("codenames", "Alice")
 
     room = await manager.set_ready(room.code, host_id, True)
     assert room.players[host_id].is_ready is True
@@ -113,14 +113,14 @@ async def test_set_ready_toggles_player_state(manager: RoomManager):
 
 
 async def test_set_ready_unknown_player_raises(manager: RoomManager):
-    room, _ = await manager.create_room("spyfall", "Alice")
+    room, _ = await manager.create_room("codenames", "Alice")
 
     with pytest.raises(PlayerNotFoundError):
         await manager.set_ready(room.code, "nobody", True)
 
 
 async def test_update_profile_changes_display_name_and_avatar(manager: RoomManager):
-    room, host_id = await manager.create_room("spyfall", "Alice")
+    room, host_id = await manager.create_room("codenames", "Alice")
 
     room = await manager.update_profile(room.code, host_id, display_name="Alicia", avatar="fox")
 
@@ -129,7 +129,7 @@ async def test_update_profile_changes_display_name_and_avatar(manager: RoomManag
 
 
 async def test_update_profile_partial_update_leaves_other_field(manager: RoomManager):
-    room, host_id = await manager.create_room("spyfall", "Alice", host_avatar="cat")
+    room, host_id = await manager.create_room("codenames", "Alice", host_avatar="cat")
 
     room = await manager.update_profile(room.code, host_id, display_name="Alicia")
 

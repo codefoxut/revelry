@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="REVELRY_", extra="ignore")
 
-    app_name: str = "Revelry - Spyfall"
+    app_name: str = "Revelry - Codenames"
     debug: bool = False
     cors_origins: list[str] = ["http://localhost:3000"]
     frontend_base_url: str = "http://localhost:3000"

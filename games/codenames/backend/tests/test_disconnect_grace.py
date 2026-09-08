@@ -37,7 +37,7 @@ def isolated_manager():
 
 
 def _create_room(manager: RoomManager):
-    return asyncio.run(manager.create_room(game_type="spyfall", host_display_name="Alice"))
+    return asyncio.run(manager.create_room(game_type="codenames", host_display_name="Alice"))
 
 
 def _join_room(manager: RoomManager, code: str, display_name: str = "Bob"):

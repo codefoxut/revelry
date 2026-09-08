@@ -40,59 +40,55 @@ class KickedEvent(BaseModel):
     type: Literal["kicked"] = "kicked"
 
 
-class RoleAssignedEvent(BaseModel):
-    """A player's own assignment, sent only to that player (once at game
+class TeamAssignedEvent(BaseModel):
+    """A player's own team + role, sent only to that player (once at game
     start, and again on reconnect) — never broadcast to the room.
-    `location`/`role` are both null exactly when `is_spy` is true.
     """
 
-    type: Literal["role_assigned"] = "role_assigned"
-    is_spy: bool
-    location: str | None
-    role: str | None
+    type: Literal["team_assigned"] = "team_assigned"
+    team: str
+    role: str
 
 
-class VoteCastEvent(BaseModel):
-    """A single public vote during VOTING. Votes are open, so this is
-    broadcast to the whole room as each one comes in.
+class SpymasterViewEvent(BaseModel):
+    """The full 25-card color list, sent only to that room's two spymasters
+    (once at game start, and again on reconnect) — never broadcast, since
+    it's the one piece of state guessers must never see.
     """
 
-    type: Literal["vote_cast"] = "vote_cast"
-    player_id: str
-    target_player_id: str
+    type: Literal["spymaster_view"] = "spymaster_view"
+    colors: list[str]
 
 
-class PlayerRoleRevealOut(BaseModel):
-    """One player's final assignment, only ever sent alongside
-    `GameOverEvent` — it stops being private information once the game has
-    ended."""
+class ClueGivenEvent(BaseModel):
+    """Public: the active team's spymaster has given a clue."""
 
-    player_id: str
-    is_spy: bool
-    role: str | None
+    type: Literal["clue_given"] = "clue_given"
+    team: str
+    word: str
+    number: int
+
+
+class CardRevealedEvent(BaseModel):
+    """Public: a card has been guessed and its color revealed."""
+
+    type: Literal["card_revealed"] = "card_revealed"
+    card_index: int
+    word: str
+    color: str
+    guessed_by: str
 
 
 class GameOverEvent(BaseModel):
-    """The game has ended. `accused_player_id` is null when the spy won by
-    correctly guessing the location, or by evading a tied/no-consensus
-    vote — otherwise it's whoever the room voted to accuse.
+    """The game has ended, either by a team finding all their words or by
+    someone guessing the assassin card. `colors` is the full board, now
+    safe to reveal to everyone.
     """
 
     type: Literal["game_over"] = "game_over"
     winning_side: str
-    location: str
-    spy_player_ids: list[str]
-    accused_player_id: str | None
-    reveals: list[PlayerRoleRevealOut]
-
-
-class DiscussionTimerStartedEvent(BaseModel):
-    """Public: a new discussion window has started, giving the room
-    `duration_seconds` before it auto-advances to VOTING.
-    """
-
-    type: Literal["discussion_timer_started"] = "discussion_timer_started"
-    duration_seconds: float
+    reason: str
+    colors: list[str]
 
 
 # ---- Client -> Server ----
@@ -126,38 +122,28 @@ class LeaveRoomCommand(BaseModel):
 
 
 class StartGameCommand(BaseModel):
-    """Host-only: moves the room out of the lobby into DISCUSSION.
-
-    `enabled_location_keys` restricts which locations can be picked for
-    this round; omitted or null falls back to the full location bank (see
-    locations.py).
-    """
+    """Host-only: moves the room out of the lobby, randomly assigning teams
+    and spymasters and dealing a fresh 25-word board."""
 
     type: Literal["start_game"] = "start_game"
-    enabled_location_keys: list[str] | None = None
 
 
-class AdvancePhaseCommand(BaseModel):
-    """Host-only: manually advances to the next phase — DISCUSSION -> VOTING,
-    or VOTING -> GAME_OVER (resolving the vote). Stands in for automatic
-    timer/vote-driven advancement during DISCUSSION.
-    """
+class GiveClueCommand(BaseModel):
+    """The active team's spymaster's clue for this turn."""
 
-    type: Literal["advance_phase"] = "advance_phase"
-
-
-class CastVoteCommand(BaseModel):
-    """A player's public vote for who they think the spy is, cast during
-    VOTING."""
-
-    type: Literal["cast_vote"] = "cast_vote"
-    target_player_id: str
+    type: Literal["give_clue"] = "give_clue"
+    word: str
+    number: int
 
 
-class GuessLocationCommand(BaseModel):
-    """The spy's alternate win condition: guessing the secret location.
-    Valid at any time during DISCUSSION or VOTING.
-    """
+class MakeGuessCommand(BaseModel):
+    """A guesser on the active team guessing one unrevealed card."""
 
-    type: Literal["guess_location"] = "guess_location"
-    location_key: str
+    type: Literal["make_guess"] = "make_guess"
+    card_index: int
+
+
+class EndTurnCommand(BaseModel):
+    """A guesser on the active team voluntarily passing the turn."""
+
+    type: Literal["end_turn"] = "end_turn"

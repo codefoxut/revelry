@@ -29,12 +29,12 @@ async def test_create_room_returns_host_player_id():
     async with await _client() as client:
         response = await client.post(
             "/api/rooms",
-            json={"game_type": "spyfall", "host_display_name": "Alice"},
+            json={"game_type": "codenames", "host_display_name": "Alice"},
         )
 
     assert response.status_code == 201
     body = response.json()
-    assert body["room"]["game_type"] == "spyfall"
+    assert body["room"]["game_type"] == "codenames"
     assert len(body["room"]["players"]) == 1
     assert body["room"]["players"][0]["id"] == body["player_id"]
     assert body["room"]["invite_url"].endswith(f"/room/{body['room']['code']}")
@@ -44,7 +44,7 @@ async def test_get_room_summary_hides_player_identities():
     async with await _client() as client:
         created = await client.post(
             "/api/rooms",
-            json={"game_type": "spyfall", "host_display_name": "Alice"},
+            json={"game_type": "codenames", "host_display_name": "Alice"},
         )
         code = created.json()["room"]["code"]
 
@@ -67,7 +67,7 @@ async def test_join_room_adds_second_player():
     async with await _client() as client:
         created = await client.post(
             "/api/rooms",
-            json={"game_type": "spyfall", "host_display_name": "Alice"},
+            json={"game_type": "codenames", "host_display_name": "Alice"},
         )
         code = created.json()["room"]["code"]
 
@@ -96,7 +96,7 @@ async def test_join_full_room_returns_409():
     async with await _client() as client:
         created = await client.post(
             "/api/rooms",
-            json={"game_type": "spyfall", "host_display_name": "Alice"},
+            json={"game_type": "codenames", "host_display_name": "Alice"},
         )
         code = created.json()["room"]["code"]
 
@@ -118,7 +118,7 @@ async def test_create_and_join_persist_avatar():
     async with await _client() as client:
         created = await client.post(
             "/api/rooms",
-            json={"game_type": "spyfall", "host_display_name": "Alice", "host_avatar": "fox"},
+            json={"game_type": "codenames", "host_display_name": "Alice", "host_avatar": "fox"},
         )
         code = created.json()["room"]["code"]
 
@@ -137,7 +137,7 @@ async def test_join_in_progress_room_via_rest_is_spectator():
     async with await _client() as client:
         created = await client.post(
             "/api/rooms",
-            json={"game_type": "spyfall", "host_display_name": "Alice"},
+            json={"game_type": "codenames", "host_display_name": "Alice"},
         )
         code = created.json()["room"]["code"]
 
