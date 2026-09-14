@@ -11,7 +11,7 @@ Usage:
         [--guess-the-personality-port 8081] [--pictionary-port 9090] \
         [--heads-up-port 8082] [--emoji-charades-port 8083] \
         [--name-that-tune-port 8084] [--spyfall-port 3100] [--codenames-port 3200] \
-        [--trivia-showdown-port 3300]
+        [--trivia-showdown-port 3300] [--two-truths-and-a-lie-port 4100]
 """
 
 import argparse
@@ -35,6 +35,7 @@ def build_games(
     spyfall_port: int,
     codenames_port: int,
     trivia_showdown_port: int,
+    two_truths_and_a_lie_port: int,
 ) -> list[dict]:
     return [
         {
@@ -106,6 +107,13 @@ def build_games(
             "url": f"http://localhost:{trivia_showdown_port}",
             "path": "games/trivia-showdown",
             "start": "cd games/trivia-showdown && make install && make dev",
+        },
+        {
+            "name": "Two Truths and a Lie",
+            "description": "Share two truths and one lie — can your friends guess which is which?",
+            "url": f"http://localhost:{two_truths_and_a_lie_port}",
+            "path": "games/two-truths-and-a-lie",
+            "start": "cd games/two-truths-and-a-lie && make install && make dev",
         },
     ]
 
@@ -185,6 +193,12 @@ def main() -> None:
     parser.add_argument(
         "--trivia-showdown-port", type=int, default=3300, help="port Trivia Showdown's frontend runs on"
     )
+    parser.add_argument(
+        "--two-truths-and-a-lie-port",
+        type=int,
+        default=4100,
+        help="port Two Truths and a Lie's frontend runs on",
+    )
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), Handler)
@@ -199,6 +213,7 @@ def main() -> None:
         args.spyfall_port,
         args.codenames_port,
         args.trivia_showdown_port,
+        args.two_truths_and_a_lie_port,
     )
     print(f"Revelry games hub running at http://localhost:{args.port}")
     try:
