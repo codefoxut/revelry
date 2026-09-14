@@ -12,7 +12,7 @@ Usage:
         [--heads-up-port 8082] [--emoji-charades-port 8083] \
         [--name-that-tune-port 8084] [--spyfall-port 3100] [--codenames-port 3200] \
         [--trivia-showdown-port 3300] [--two-truths-and-a-lie-port 4100] \
-        [--fill-in-the-blank-port 3700]
+        [--fill-in-the-blank-port 3700] [--family-feud-port 3600]
 """
 
 import argparse
@@ -38,6 +38,7 @@ def build_games(
     trivia_showdown_port: int,
     two_truths_and_a_lie_port: int,
     fill_in_the_blank_port: int,
+    family_feud_port: int,
 ) -> list[dict]:
     return [
         {
@@ -123,6 +124,13 @@ def build_games(
             "url": f"http://localhost:{fill_in_the_blank_port}",
             "path": "games/fill-in-the-blank",
             "start": "cd games/fill-in-the-blank && make install && make dev",
+        },
+        {
+            "name": "Family Feud Live",
+            "description": "Survey says! Two teams compete to name the most popular answers — buzz in, reveal slots, steal the points.",
+            "url": f"http://localhost:{family_feud_port}",
+            "path": "games/family-feud",
+            "start": "cd games/family-feud && make install && make dev",
         },
     ]
 
@@ -214,6 +222,12 @@ def main() -> None:
         default=3700,
         help="port Fill in the Blank's frontend runs on",
     )
+    parser.add_argument(
+        "--family-feud-port",
+        type=int,
+        default=3600,
+        help="port Family Feud Live's frontend runs on",
+    )
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), Handler)
@@ -230,6 +244,7 @@ def main() -> None:
         args.trivia_showdown_port,
         args.two_truths_and_a_lie_port,
         args.fill_in_the_blank_port,
+        args.family_feud_port,
     )
     print(f"Revelry games hub running at http://localhost:{args.port}")
     try:
