@@ -11,7 +11,8 @@ Usage:
         [--guess-the-personality-port 8081] [--pictionary-port 9090] \
         [--heads-up-port 8082] [--emoji-charades-port 8083] \
         [--name-that-tune-port 8084] [--spyfall-port 3100] [--codenames-port 3200] \
-        [--trivia-showdown-port 3300] [--two-truths-and-a-lie-port 4100]
+        [--trivia-showdown-port 3300] [--two-truths-and-a-lie-port 4100] \
+        [--fill-in-the-blank-port 3700]
 """
 
 import argparse
@@ -36,6 +37,7 @@ def build_games(
     codenames_port: int,
     trivia_showdown_port: int,
     two_truths_and_a_lie_port: int,
+    fill_in_the_blank_port: int,
 ) -> list[dict]:
     return [
         {
@@ -114,6 +116,13 @@ def build_games(
             "url": f"http://localhost:{two_truths_and_a_lie_port}",
             "path": "games/two-truths-and-a-lie",
             "start": "cd games/two-truths-and-a-lie && make install && make dev",
+        },
+        {
+            "name": "Fill in the Blank",
+            "description": "Mad-libs party game — write the funniest answer to fill the blank, then vote!",
+            "url": f"http://localhost:{fill_in_the_blank_port}",
+            "path": "games/fill-in-the-blank",
+            "start": "cd games/fill-in-the-blank && make install && make dev",
         },
     ]
 
@@ -199,6 +208,12 @@ def main() -> None:
         default=4100,
         help="port Two Truths and a Lie's frontend runs on",
     )
+    parser.add_argument(
+        "--fill-in-the-blank-port",
+        type=int,
+        default=3700,
+        help="port Fill in the Blank's frontend runs on",
+    )
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), Handler)
@@ -214,6 +229,7 @@ def main() -> None:
         args.codenames_port,
         args.trivia_showdown_port,
         args.two_truths_and_a_lie_port,
+        args.fill_in_the_blank_port,
     )
     print(f"Revelry games hub running at http://localhost:{args.port}")
     try:
