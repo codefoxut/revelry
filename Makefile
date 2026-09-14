@@ -1,4 +1,4 @@
-.PHONY: run hub open mafia charades guess-the-personality pictionary heads-up emoji-charades name-that-tune spyfall codenames trivia-showdown two-truths-and-a-lie fill-in-the-blank
+.PHONY: run hub open mafia charades guess-the-personality pictionary heads-up emoji-charades name-that-tune spyfall codenames trivia-showdown two-truths-and-a-lie fill-in-the-blank family-feud wavelength would-you-rather rapid-fire scattergories-sprint
 
 HUB_PORT ?= 4000
 MAFIA_FRONTEND_PORT ?= 3000
@@ -15,10 +15,20 @@ CODENAMES_FRONTEND_PORT ?= 3200
 CODENAMES_BACKEND_PORT ?= 8200
 TRIVIA_SHOWDOWN_FRONTEND_PORT ?= 3300
 TRIVIA_SHOWDOWN_BACKEND_PORT ?= 8300
-TWO_TRUTHS_FRONTEND_PORT ?= 4100
-TWO_TRUTHS_BACKEND_PORT ?= 9000
+WOULD_YOU_RATHER_FRONTEND_PORT ?= 3400
+WOULD_YOU_RATHER_BACKEND_PORT ?= 8400
+RAPID_FIRE_FRONTEND_PORT ?= 3500
+RAPID_FIRE_BACKEND_PORT ?= 8500
+FAMILY_FEUD_FRONTEND_PORT ?= 3600
+FAMILY_FEUD_BACKEND_PORT ?= 8600
 FILL_IN_THE_BLANK_FRONTEND_PORT ?= 3700
 FILL_IN_THE_BLANK_BACKEND_PORT ?= 8700
+WAVELENGTH_FRONTEND_PORT ?= 3800
+WAVELENGTH_BACKEND_PORT ?= 8800
+SCATTERGORIES_SPRINT_FRONTEND_PORT ?= 3900
+SCATTERGORIES_SPRINT_BACKEND_PORT ?= 8900
+TWO_TRUTHS_FRONTEND_PORT ?= 4100
+TWO_TRUTHS_BACKEND_PORT ?= 9000
 
 URL := http://localhost:$(HUB_PORT)
 
@@ -27,14 +37,14 @@ URL := http://localhost:$(HUB_PORT)
 # in the background, opens it in your browser, then waits on it in the
 # foreground so Ctrl+C stops it.
 run:
-	@python3 hub.py --port $(HUB_PORT) --mafia-port $(MAFIA_FRONTEND_PORT) --charades-port $(CHARADES_PORT) --guess-the-personality-port $(GUESS_THE_PERSONALITY_PORT) --pictionary-port $(PICTIONARY_PORT) --heads-up-port $(HEADS_UP_PORT) --emoji-charades-port $(EMOJI_CHARADES_PORT) --name-that-tune-port $(NAME_THAT_TUNE_PORT) --spyfall-port $(SPYFALL_FRONTEND_PORT) --codenames-port $(CODENAMES_FRONTEND_PORT) --trivia-showdown-port $(TRIVIA_SHOWDOWN_FRONTEND_PORT) --two-truths-and-a-lie-port $(TWO_TRUTHS_FRONTEND_PORT) --fill-in-the-blank-port $(FILL_IN_THE_BLANK_FRONTEND_PORT) & \
+	@python3 hub.py --port $(HUB_PORT) --mafia-port $(MAFIA_FRONTEND_PORT) --charades-port $(CHARADES_PORT) --guess-the-personality-port $(GUESS_THE_PERSONALITY_PORT) --pictionary-port $(PICTIONARY_PORT) --heads-up-port $(HEADS_UP_PORT) --emoji-charades-port $(EMOJI_CHARADES_PORT) --name-that-tune-port $(NAME_THAT_TUNE_PORT) --spyfall-port $(SPYFALL_FRONTEND_PORT) --codenames-port $(CODENAMES_FRONTEND_PORT) --trivia-showdown-port $(TRIVIA_SHOWDOWN_FRONTEND_PORT) --would-you-rather-port $(WOULD_YOU_RATHER_FRONTEND_PORT) --rapid-fire-port $(RAPID_FIRE_FRONTEND_PORT) --family-feud-port $(FAMILY_FEUD_FRONTEND_PORT) --fill-in-the-blank-port $(FILL_IN_THE_BLANK_FRONTEND_PORT) --wavelength-port $(WAVELENGTH_FRONTEND_PORT) --scattergories-sprint-port $(SCATTERGORIES_SPRINT_FRONTEND_PORT) --two-truths-and-a-lie-port $(TWO_TRUTHS_FRONTEND_PORT) & \
 	pid=$$!; \
 	sleep 1; \
 	command -v open >/dev/null 2>&1 && open "$(URL)" || xdg-open "$(URL)"; \
 	wait $$pid
 
 hub:
-	python3 hub.py --port $(HUB_PORT) --mafia-port $(MAFIA_FRONTEND_PORT) --charades-port $(CHARADES_PORT) --guess-the-personality-port $(GUESS_THE_PERSONALITY_PORT) --pictionary-port $(PICTIONARY_PORT) --heads-up-port $(HEADS_UP_PORT) --emoji-charades-port $(EMOJI_CHARADES_PORT) --name-that-tune-port $(NAME_THAT_TUNE_PORT) --spyfall-port $(SPYFALL_FRONTEND_PORT) --codenames-port $(CODENAMES_FRONTEND_PORT) --trivia-showdown-port $(TRIVIA_SHOWDOWN_FRONTEND_PORT) --two-truths-and-a-lie-port $(TWO_TRUTHS_FRONTEND_PORT) --fill-in-the-blank-port $(FILL_IN_THE_BLANK_FRONTEND_PORT)
+	python3 hub.py --port $(HUB_PORT) --mafia-port $(MAFIA_FRONTEND_PORT) --charades-port $(CHARADES_PORT) --guess-the-personality-port $(GUESS_THE_PERSONALITY_PORT) --pictionary-port $(PICTIONARY_PORT) --heads-up-port $(HEADS_UP_PORT) --emoji-charades-port $(EMOJI_CHARADES_PORT) --name-that-tune-port $(NAME_THAT_TUNE_PORT) --spyfall-port $(SPYFALL_FRONTEND_PORT) --codenames-port $(CODENAMES_FRONTEND_PORT) --trivia-showdown-port $(TRIVIA_SHOWDOWN_FRONTEND_PORT) --would-you-rather-port $(WOULD_YOU_RATHER_FRONTEND_PORT) --rapid-fire-port $(RAPID_FIRE_FRONTEND_PORT) --family-feud-port $(FAMILY_FEUD_FRONTEND_PORT) --fill-in-the-blank-port $(FILL_IN_THE_BLANK_FRONTEND_PORT) --wavelength-port $(WAVELENGTH_FRONTEND_PORT) --scattergories-sprint-port $(SCATTERGORIES_SPRINT_FRONTEND_PORT) --two-truths-and-a-lie-port $(TWO_TRUTHS_FRONTEND_PORT)
 
 # Opens the hub page in your default browser. Run this from a second
 # terminal (or after backgrounding `make run`) once the hub is up.
@@ -84,3 +94,23 @@ two-truths-and-a-lie:
 fill-in-the-blank:
 	$(MAKE) -C games/fill-in-the-blank install
 	$(MAKE) -C games/fill-in-the-blank dev FRONTEND_PORT=$(FILL_IN_THE_BLANK_FRONTEND_PORT) BACKEND_PORT=$(FILL_IN_THE_BLANK_BACKEND_PORT)
+
+family-feud:
+	$(MAKE) -C games/family-feud install
+	$(MAKE) -C games/family-feud dev FRONTEND_PORT=$(FAMILY_FEUD_FRONTEND_PORT) BACKEND_PORT=$(FAMILY_FEUD_BACKEND_PORT)
+
+wavelength:
+	$(MAKE) -C games/wavelength install
+	$(MAKE) -C games/wavelength dev FRONTEND_PORT=$(WAVELENGTH_FRONTEND_PORT) BACKEND_PORT=$(WAVELENGTH_BACKEND_PORT)
+
+would-you-rather:
+	$(MAKE) -C games/would-you-rather install
+	$(MAKE) -C games/would-you-rather dev FRONTEND_PORT=$(WOULD_YOU_RATHER_FRONTEND_PORT) BACKEND_PORT=$(WOULD_YOU_RATHER_BACKEND_PORT)
+
+rapid-fire:
+	$(MAKE) -C games/rapid-fire install
+	$(MAKE) -C games/rapid-fire dev FRONTEND_PORT=$(RAPID_FIRE_FRONTEND_PORT) BACKEND_PORT=$(RAPID_FIRE_BACKEND_PORT)
+
+scattergories-sprint:
+	$(MAKE) -C games/scattergories-sprint install
+	$(MAKE) -C games/scattergories-sprint dev FRONTEND_PORT=$(SCATTERGORIES_SPRINT_FRONTEND_PORT) BACKEND_PORT=$(SCATTERGORIES_SPRINT_BACKEND_PORT)

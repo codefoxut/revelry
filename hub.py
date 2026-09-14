@@ -11,8 +11,10 @@ Usage:
         [--guess-the-personality-port 8081] [--pictionary-port 9090] \
         [--heads-up-port 8082] [--emoji-charades-port 8083] \
         [--name-that-tune-port 8084] [--spyfall-port 3100] [--codenames-port 3200] \
-        [--trivia-showdown-port 3300] [--two-truths-and-a-lie-port 4100] \
-        [--fill-in-the-blank-port 3700] [--family-feud-port 3600]
+        [--trivia-showdown-port 3300] [--would-you-rather-port 3400] \
+        [--rapid-fire-port 3500] [--family-feud-port 3600] \
+        [--fill-in-the-blank-port 3700] [--wavelength-port 3800] \
+        [--scattergories-sprint-port 3900] [--two-truths-and-a-lie-port 4100]
 """
 
 import argparse
@@ -36,9 +38,13 @@ def build_games(
     spyfall_port: int,
     codenames_port: int,
     trivia_showdown_port: int,
-    two_truths_and_a_lie_port: int,
-    fill_in_the_blank_port: int,
+    would_you_rather_port: int,
+    rapid_fire_port: int,
     family_feud_port: int,
+    fill_in_the_blank_port: int,
+    wavelength_port: int,
+    scattergories_sprint_port: int,
+    two_truths_and_a_lie_port: int,
 ) -> list[dict]:
     return [
         {
@@ -126,11 +132,39 @@ def build_games(
             "start": "cd games/fill-in-the-blank && make install && make dev",
         },
         {
+            "name": "Would You Rather Live",
+            "description": "A or B — everyone votes anonymously, then the host reveals the split. No right answer, just opinions.",
+            "url": f"http://localhost:{would_you_rather_port}",
+            "path": "games/would-you-rather",
+            "start": "cd games/would-you-rather && make install && make dev",
+        },
+        {
+            "name": "Rapid Fire",
+            "description": "Pure reaction-speed buzzer — host arms the round, a random delay fires GO, fastest correct buzz wins.",
+            "url": f"http://localhost:{rapid_fire_port}",
+            "path": "games/rapid-fire",
+            "start": "cd games/rapid-fire && make install && make dev",
+        },
+        {
             "name": "Family Feud Live",
             "description": "Survey says! Two teams compete to name the most popular answers — buzz in, reveal slots, steal the points.",
             "url": f"http://localhost:{family_feud_port}",
             "path": "games/family-feud",
             "start": "cd games/family-feud && make install && make dev",
+        },
+        {
+            "name": "Wavelength",
+            "description": "Psychic gives a clue for a hidden spot on a spectrum — guessers drag a slider to find it.",
+            "url": f"http://localhost:{wavelength_port}",
+            "path": "games/wavelength",
+            "start": "cd games/wavelength && make install && make dev",
+        },
+        {
+            "name": "Scattergories Sprint",
+            "description": "Pick answers starting with the round's letter — unique answers score more than duplicates.",
+            "url": f"http://localhost:{scattergories_sprint_port}",
+            "path": "games/scattergories-sprint",
+            "start": "cd games/scattergories-sprint && make install && make dev",
         },
     ]
 
@@ -211,10 +245,22 @@ def main() -> None:
         "--trivia-showdown-port", type=int, default=3300, help="port Trivia Showdown's frontend runs on"
     )
     parser.add_argument(
-        "--two-truths-and-a-lie-port",
+        "--would-you-rather-port",
         type=int,
-        default=4100,
-        help="port Two Truths and a Lie's frontend runs on",
+        default=3400,
+        help="port Would You Rather Live's frontend runs on",
+    )
+    parser.add_argument(
+        "--rapid-fire-port",
+        type=int,
+        default=3500,
+        help="port Rapid Fire's frontend runs on",
+    )
+    parser.add_argument(
+        "--family-feud-port",
+        type=int,
+        default=3600,
+        help="port Family Feud Live's frontend runs on",
     )
     parser.add_argument(
         "--fill-in-the-blank-port",
@@ -223,10 +269,22 @@ def main() -> None:
         help="port Fill in the Blank's frontend runs on",
     )
     parser.add_argument(
-        "--family-feud-port",
+        "--wavelength-port",
         type=int,
-        default=3600,
-        help="port Family Feud Live's frontend runs on",
+        default=3800,
+        help="port Wavelength's frontend runs on",
+    )
+    parser.add_argument(
+        "--scattergories-sprint-port",
+        type=int,
+        default=3900,
+        help="port Scattergories Sprint's frontend runs on",
+    )
+    parser.add_argument(
+        "--two-truths-and-a-lie-port",
+        type=int,
+        default=4100,
+        help="port Two Truths and a Lie's frontend runs on",
     )
     args = parser.parse_args()
 
@@ -242,9 +300,13 @@ def main() -> None:
         args.spyfall_port,
         args.codenames_port,
         args.trivia_showdown_port,
-        args.two_truths_and_a_lie_port,
-        args.fill_in_the_blank_port,
+        args.would_you_rather_port,
+        args.rapid_fire_port,
         args.family_feud_port,
+        args.fill_in_the_blank_port,
+        args.wavelength_port,
+        args.scattergories_sprint_port,
+        args.two_truths_and_a_lie_port,
     )
     print(f"Revelry games hub running at http://localhost:{args.port}")
     try:
