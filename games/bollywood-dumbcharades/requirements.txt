@@ -1,6 +1,6 @@
-fastapi[all]
+-r ../configs/pip/fastapi_reqs.txt
+
 anthropic
-uvicorn[standard]
 python-dotenv
 httpx2
 beautifulsoup4

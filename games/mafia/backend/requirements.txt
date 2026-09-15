@@ -1,12 +1,7 @@
-fastapi>=0.115
-uvicorn[standard]>=0.52.4
-pydantic>=2.13.5
-pydantic-settings>=2.5
+-r ../../configs/pip/fastapi_reqs.txt
+-r ../../configs/pip/pytest_reqs.txt
+-r ../../configs/pip/httpx2_reqs.txt
+
 sqlalchemy>=2.0
 aiosqlite>=0.20
-greenlet>=3.1
-websockets>=17.1
-
-pytest>=8.3
-pytest-asyncio>=1.4.0
-httpx2>=2.0
+greenlet>=3.5.5
