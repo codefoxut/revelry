@@ -1,0 +1,5 @@
+fastapi[all]>=0.115
+uvicorn[standard]>=0.30
+pydantic-settings>=2.15.0
+pydantic>=2.13.5
+websockets>=17.1

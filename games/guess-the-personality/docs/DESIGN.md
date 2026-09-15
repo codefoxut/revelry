@@ -175,7 +175,7 @@ framework, no external JS/CSS dependencies.
 
 ## Config, deployment, dependencies
 
-- `requirements.txt`: `fastapi[all]`, `anthropic`, `uvicorn[standard]`,
+- `fastapi_reqs.txt`: `fastapi[all]`, `anthropic`, `uvicorn[standard]`,
   `python-dotenv`, `requests` (the last one only used by
   `tools/scrape_wikidata_personalities.py`, not by gameplay itself).
 - `.env` (gitignored) must contain `ANTHROPIC_API_KEY=...`.
@@ -199,7 +199,7 @@ framework, no external JS/CSS dependencies.
 ## Moving this to another repo — checklist
 
 1. Copy `main.py`, `personality_db.py`, `static/index.html`,
-   `requirements.txt`, `Makefile`, `.gitignore`, and `data/personalities.db`
+   `fastapi_reqs.txt`, `Makefile`, `.gitignore`, and `data/personalities.db`
    (the populated database itself — see
    [`PERSONALITY_DATABASE.md`](PERSONALITY_DATABASE.md); without it the app
    still runs but every category samples zero personalities).
