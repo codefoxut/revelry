@@ -1,0 +1,53 @@
+export interface Player {
+  id: string;
+  display_name: string;
+  avatar: string;
+  is_host: boolean;
+  is_ready: boolean;
+  is_spectator: boolean;
+  connected: boolean;
+}
+
+export interface BoardSlot {
+  text: string | null;
+  points: number | null;
+  revealed: boolean;
+}
+
+export interface GameState {
+  phase: string;
+  round_number: number;
+  total_rounds: number;
+  prompt: string | null;
+  answer_count: number;
+  board: BoardSlot[];
+  controlling_team: "a" | "b" | null;
+  strikes: number;
+  team_scores: Record<"a" | "b", number>;
+  team_of: Record<string, "a" | "b">;
+}
+
+export interface Room {
+  code: string;
+  game_type: string;
+  is_private: boolean;
+  phase: string;
+  max_players: number;
+  players: Player[];
+  invite_url: string;
+  game_state: GameState | null;
+}
+
+export interface RoomSummary {
+  code: string;
+  game_type: string;
+  phase: string;
+  is_private: boolean;
+  player_count: number;
+  max_players: number;
+}
+
+export interface CreateRoomResponse {
+  room: Room;
+  player_id: string;
+}

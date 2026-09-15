@@ -1,43 +1,46 @@
 import pytest
 
-from app.games.codenames.phases import CODENAMES_TRANSITIONS, CodenamesPhase
+from app.games.trivia_showdown.phases import TRIVIA_TRANSITIONS, TriviaPhase
 from app.platform.state_machine import StateMachine
 
 
 def test_initial_phase_is_lobby():
-    machine = StateMachine(CodenamesPhase.LOBBY, CODENAMES_TRANSITIONS)
-    assert machine.phase == CodenamesPhase.LOBBY
+    machine = StateMachine(TriviaPhase.LOBBY, TRIVIA_TRANSITIONS)
+    assert machine.phase == TriviaPhase.LOBBY
 
 
-def test_lobby_can_start_on_either_team():
-    machine = StateMachine(CodenamesPhase.LOBBY, CODENAMES_TRANSITIONS)
-    assert machine.can_transition_to(CodenamesPhase.RED_TURN)
-    assert machine.can_transition_to(CodenamesPhase.BLUE_TURN)
+def test_lobby_can_only_open_the_first_question():
+    machine = StateMachine(TriviaPhase.LOBBY, TRIVIA_TRANSITIONS)
+    assert machine.can_transition_to(TriviaPhase.QUESTION_OPEN)
+    assert not machine.can_transition_to(TriviaPhase.ANSWERING)
 
 
-def test_turns_alternate_back_and_forth():
-    machine = StateMachine(CodenamesPhase.LOBBY, CODENAMES_TRANSITIONS)
-    machine.transition_to(CodenamesPhase.RED_TURN)
-    machine.transition_to(CodenamesPhase.BLUE_TURN)
-    machine.transition_to(CodenamesPhase.RED_TURN)
-    assert machine.phase == CodenamesPhase.RED_TURN
+def test_a_buzz_moves_into_answering_and_back():
+    machine = StateMachine(TriviaPhase.LOBBY, TRIVIA_TRANSITIONS)
+    machine.transition_to(TriviaPhase.QUESTION_OPEN)
+    machine.transition_to(TriviaPhase.ANSWERING)
+    machine.transition_to(TriviaPhase.QUESTION_OPEN)
+    assert machine.phase == TriviaPhase.QUESTION_OPEN
 
 
-def test_either_turn_can_end_the_game():
-    machine = StateMachine(CodenamesPhase.LOBBY, CODENAMES_TRANSITIONS)
-    machine.transition_to(CodenamesPhase.RED_TURN)
-    machine.transition_to(CodenamesPhase.GAME_OVER)
-    assert machine.phase == CodenamesPhase.GAME_OVER
+def test_revealed_can_advance_to_the_next_question_or_end_the_game():
+    machine = StateMachine(TriviaPhase.LOBBY, TRIVIA_TRANSITIONS)
+    machine.transition_to(TriviaPhase.QUESTION_OPEN)
+    machine.transition_to(TriviaPhase.REVEALED)
+    assert machine.can_transition_to(TriviaPhase.QUESTION_OPEN)
+    assert machine.can_transition_to(TriviaPhase.GAME_OVER)
+    machine.transition_to(TriviaPhase.GAME_OVER)
+    assert machine.phase == TriviaPhase.GAME_OVER
 
 
 def test_game_over_is_terminal():
-    machine = StateMachine(CodenamesPhase.GAME_OVER, CODENAMES_TRANSITIONS)
-    assert not machine.can_transition_to(CodenamesPhase.RED_TURN)
+    machine = StateMachine(TriviaPhase.GAME_OVER, TRIVIA_TRANSITIONS)
+    assert not machine.can_transition_to(TriviaPhase.QUESTION_OPEN)
     with pytest.raises(ValueError):
-        machine.transition_to(CodenamesPhase.RED_TURN)
+        machine.transition_to(TriviaPhase.QUESTION_OPEN)
 
 
-def test_cannot_skip_lobby_straight_to_game_over():
-    machine = StateMachine(CodenamesPhase.LOBBY, CODENAMES_TRANSITIONS)
+def test_cannot_skip_lobby_straight_to_answering():
+    machine = StateMachine(TriviaPhase.LOBBY, TRIVIA_TRANSITIONS)
     with pytest.raises(ValueError):
-        machine.transition_to(CodenamesPhase.GAME_OVER)
+        machine.transition_to(TriviaPhase.ANSWERING)
