@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/config";
+import { apiBaseUrl } from "@/lib/config";
 import type { GameInfo } from "@/types/game-info";
 import type { CreateRoomResponse, RoomSummary } from "@/types/room";
 
@@ -11,7 +11,7 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
 }
 
 export async function createRoom(hostDisplayName: string, hostAvatar = "default"): Promise<CreateRoomResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/rooms`, {
+  const response = await fetch(`${apiBaseUrl()}/api/rooms`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ game_type: "mafia", host_display_name: hostDisplayName, host_avatar: hostAvatar }),
@@ -20,7 +20,7 @@ export async function createRoom(hostDisplayName: string, hostAvatar = "default"
 }
 
 export async function joinRoom(code: string, displayName: string, avatar = "default"): Promise<CreateRoomResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/rooms/${code}/join`, {
+  const response = await fetch(`${apiBaseUrl()}/api/rooms/${code}/join`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ display_name: displayName, avatar }),
@@ -29,11 +29,11 @@ export async function joinRoom(code: string, displayName: string, avatar = "defa
 }
 
 export async function getRoomSummary(code: string): Promise<RoomSummary> {
-  const response = await fetch(`${API_BASE_URL}/api/rooms/${code}`);
+  const response = await fetch(`${apiBaseUrl()}/api/rooms/${code}`);
   return parseOrThrow<RoomSummary>(response);
 }
 
 export async function getGameInfo(): Promise<GameInfo> {
-  const response = await fetch(`${API_BASE_URL}/api/game-info`);
+  const response = await fetch(`${apiBaseUrl()}/api/game-info`);
   return parseOrThrow<GameInfo>(response);
 }

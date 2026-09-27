@@ -2,8 +2,10 @@ import asyncio
 
 import pytest
 
+from app.games.mafia.phases import MafiaPhase
 from app.platform.exceptions import (
     GameAlreadyStartedError,
+    InvalidGameStateError,
     GameNotStartedError,
     NotEnoughPlayersError,
     PermissionDeniedError,
@@ -109,3 +111,27 @@ def test_get_role_returns_a_role_for_every_active_player_after_start(sessions):
     for player_id in room.players:
         role = asyncio.run(game_sessions.get_role(room.code, player_id))
         assert role is not None
+
+
+def test_reset_game_returns_a_finished_room_to_the_lobby(sessions):
+    game_sessions, room_manager = sessions
+    room, host_id = _create_room_with_players(room_manager, 3)
+    asyncio.run(game_sessions.start_game(room.code, host_id))
+
+    engine = asyncio.run(game_sessions._engine_store.get(room.code))
+    engine._machine.transition_to(MafiaPhase.GAME_OVER)
+    updated_room = asyncio.run(game_sessions.reset_game(room.code, host_id))
+
+    assert updated_room.phase == RoomPhase.LOBBY
+    assert asyncio.run(game_sessions.get_phase_snapshot(room.code)) is None
+    assert set(updated_room.players) == set(room.players)
+    assert all(not player.is_ready for player in updated_room.players.values())
+
+
+def test_reset_game_requires_game_over(sessions):
+    game_sessions, room_manager = sessions
+    room, host_id = _create_room_with_players(room_manager, 3)
+    asyncio.run(game_sessions.start_game(room.code, host_id))
+
+    with pytest.raises(InvalidGameStateError):
+        asyncio.run(game_sessions.reset_game(room.code, host_id))

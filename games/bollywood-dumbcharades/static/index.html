@@ -412,6 +412,20 @@
       margin-top: -6px;
     }
     .card-year { font-size: 0.85rem; color: var(--saffron); opacity: 0.8; }
+    .card-bonus-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(245, 200, 66, 0.12);
+      border: 1px solid rgba(245, 200, 66, 0.28);
+      color: var(--pale-gold);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
     .card-hint {
       font-size: 0.85rem;
       color: var(--pale-gold);
@@ -568,6 +582,7 @@
     }
 
     .team-field { margin-bottom: 18px; }
+    .settings-field { margin-bottom: 18px; }
     .team-field label {
       display: block;
       font-size: 0.65rem;
@@ -576,7 +591,16 @@
       color: rgba(245, 200, 66, 0.65);
       margin-bottom: 7px;
     }
+    .settings-field label {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(245, 200, 66, 0.65);
+      margin-bottom: 7px;
+    }
     .team-field label span { margin-right: 6px; }
+    .settings-field label span { margin-right: 6px; }
 
     .team-input {
       width: 100%;
@@ -597,6 +621,101 @@
       box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.08);
     }
     .team-input::placeholder { color: rgba(255,244,220,0.25); font-style: italic; }
+
+    .settings-input {
+      width: 100%;
+      background: rgba(0,0,0,0.35);
+      border: 1.5px solid rgba(245, 200, 66, 0.3);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: var(--ivory);
+      font-family: inherit;
+      font-size: 1rem;
+      outline: none;
+      caret-color: var(--gold);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .settings-input:focus {
+      border-color: rgba(245, 200, 66, 0.7);
+      box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.08);
+    }
+
+    .field-help {
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: rgba(255,244,220,0.55);
+    }
+
+    .toggle-field {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      background: rgba(0,0,0,0.28);
+      border: 1.5px solid rgba(245, 200, 66, 0.22);
+      border-radius: 8px;
+    }
+    .toggle-copy { flex: 1; }
+    .toggle-title {
+      font-size: 0.78rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(245, 200, 66, 0.8);
+      margin-bottom: 4px;
+    }
+    .toggle-help {
+      font-size: 0.74rem;
+      color: rgba(255,244,220,0.58);
+      line-height: 1.35;
+    }
+    .switch {
+      position: relative;
+      display: inline-flex;
+      width: 52px;
+      height: 30px;
+      flex-shrink: 0;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      inset: 0;
+      cursor: pointer;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(245, 200, 66, 0.25);
+      border-radius: 999px;
+      transition: all 0.2s;
+    }
+    .slider::before {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 3px;
+      top: 3px;
+      border-radius: 50%;
+      background: var(--pale-gold);
+      transition: transform 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    }
+    .switch input:checked + .slider {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--deep-saffron) 100%);
+      border-color: rgba(245, 200, 66, 0.7);
+    }
+    .switch input:checked + .slider::before {
+      transform: translateX(22px);
+      background: #2a0010;
+    }
+    .switch input:disabled + .slider {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
 
     .team-row { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px; }
     .team-row .team-field { flex: 1; margin-bottom: 0; }
@@ -677,6 +796,31 @@
 
       <div id="modeToggle" class="mode-toggle"></div>
       <div id="sourceToggle" class="mode-toggle"></div>
+
+      <div class="settings-field">
+        <label for="startYearInput"><span>📅</span> Start Year</label>
+        <input
+          class="settings-input"
+          id="startYearInput"
+          type="number"
+          inputmode="numeric"
+          step="1"
+          oninput="readStartYear()"
+          onkeydown="if(event.key==='Enter') startWithTeams()"
+        />
+        <div class="field-help" id="startYearHelp">Only movies released from this year onward will appear.</div>
+      </div>
+
+      <div class="toggle-field">
+        <div class="toggle-copy">
+          <div class="toggle-title">🔁 Allow Steal</div>
+          <div class="toggle-help">Off by default for standard play. Turn this on only if your group wants the next team to get a steal chance after a pass.</div>
+        </div>
+        <label class="switch" for="allowStealInput">
+          <input id="allowStealInput" type="checkbox" onchange="readAllowSteal()" />
+          <span class="slider"></span>
+        </label>
+      </div>
 
       <div id="teamRows"></div>
 
@@ -959,21 +1103,29 @@
     const val = Math.max(10, Math.min(300, parseInt(inp.value) || 90));
     inp.value = val;
     baseDurationSeconds = val;
-    totalSeconds = val;
-    remaining = val;
-    stopInterval();
-    timerRunning = false;
-    startPauseEl.textContent = '▶';
-    startPauseEl.classList.remove('active');
-    renderTimer();
+    applyRoundDuration(currentState ? currentState.current : null);
+  }
+
+  function titleWordCount(title) {
+    return String(title || '').trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  function getRoundDurationInfo(movie) {
+    const needed = (movie && movie.min_mime_seconds) ? movie.min_mime_seconds : 0;
+    const longTitle = !!(movie && titleWordCount(movie.title) > 6);
+    const longTitleSeconds = longTitle ? baseDurationSeconds * 2 : baseDurationSeconds;
+    return {
+      longTitle,
+      needed,
+      total: Math.max(longTitleSeconds, needed, baseDurationSeconds)
+    };
   }
 
   // Resets the round timer to baseDurationSeconds, unless the revealed
-  // movie's min_mime_seconds needs more — some titles (hard/ultra_hard)
-  // realistically can't be mimed in the player's default duration.
+  // movie needs more time due to difficulty metadata or a very long title.
   function applyRoundDuration(movie) {
-    const needed = (movie && movie.min_mime_seconds) ? movie.min_mime_seconds : 0;
-    totalSeconds = Math.max(baseDurationSeconds, needed);
+    const duration = getRoundDurationInfo(movie);
+    totalSeconds = duration.total;
     remaining = totalSeconds;
     stopInterval();
     timerRunning = false;
@@ -1005,6 +1157,10 @@
   let lastTeamNames = JSON.parse(localStorage.getItem('dc_team_names') || 'null') || ['', ''];
   let currentSource = localStorage.getItem('dc_movie_source') || 'offline';
   let onlineModeAvailable = false;
+  let minMovieYear = 1950;
+  let maxMovieYear = new Date().getFullYear();
+  let currentStartYear = Number(localStorage.getItem('dc_start_year')) || 2000;
+  let allowSteal = localStorage.getItem('dc_allow_steal') === 'true';
 
   function saveTeamNames(names) {
     lastTeamNames = names;
@@ -1013,6 +1169,45 @@
 
   function readTeamRows() {
     return Array.from(document.querySelectorAll('#teamRows .team-input')).map(inp => inp.value);
+  }
+
+  function clampStartYear(year) {
+    if (!Number.isFinite(year)) return currentStartYear;
+    return Math.min(Math.max(Math.trunc(year), minMovieYear), maxMovieYear);
+  }
+
+  function renderStartYearInput() {
+    const input = document.getElementById('startYearInput');
+    const help = document.getElementById('startYearHelp');
+    currentStartYear = clampStartYear(currentStartYear);
+    input.min = String(minMovieYear);
+    input.max = String(maxMovieYear);
+    input.value = String(currentStartYear);
+    help.textContent = `Only movies released from ${currentStartYear} onward will appear.`;
+  }
+
+  function readStartYear() {
+    const input = document.getElementById('startYearInput');
+    const parsed = Number(input.value);
+    currentStartYear = clampStartYear(parsed);
+    input.value = String(currentStartYear);
+    localStorage.setItem('dc_start_year', String(currentStartYear));
+    const help = document.getElementById('startYearHelp');
+    help.textContent = `Only movies released from ${currentStartYear} onward will appear.`;
+    return currentStartYear;
+  }
+
+  function renderAllowStealToggle() {
+    const input = document.getElementById('allowStealInput');
+    input.checked = !!allowSteal && currentMode === 'teams';
+    input.disabled = currentMode !== 'teams';
+  }
+
+  function readAllowSteal() {
+    const input = document.getElementById('allowStealInput');
+    allowSteal = currentMode === 'teams' && !!input.checked;
+    localStorage.setItem('dc_allow_steal', String(allowSteal));
+    return allowSteal;
   }
 
   function renderModeToggle() {
@@ -1026,6 +1221,7 @@
     currentMode = mode;
     localStorage.setItem('dc_mode', mode);
     renderModeToggle();
+    renderAllowStealToggle();
     buildTeamRows(Array(MODE_LIMITS[mode].min).fill(''));
   }
 
@@ -1106,7 +1302,7 @@
     const currentTeam = state.teams[state.turn_index];
     const nextTeam = state.teams[(state.turn_index + 1) % n];
 
-    if (state.pending_steal) {
+    if (state.pending_steal && state.allow_steal) {
       bannerEl.textContent = '🔁 Steal chance!';
       stageEl.innerHTML = `
         <div class="movie-card">
@@ -1123,14 +1319,23 @@
 
     if (state.current) {
       const m = state.current;
-      const extraTime = m.min_mime_seconds && m.min_mime_seconds > baseDurationSeconds;
+      const duration = getRoundDurationInfo(m);
+      const extraTime = duration.total > baseDurationSeconds;
+      const extraTimeReasons = [];
+      if (duration.longTitle) {
+        extraTimeReasons.push(`long title (${titleWordCount(m.title)} words)`);
+      }
+      if (m.min_mime_seconds && m.min_mime_seconds > baseDurationSeconds) {
+        extraTimeReasons.push(`difficulty override to ${fmtTime(m.min_mime_seconds)}`);
+      }
       stageEl.innerHTML = `
         <div class="movie-card">
           <div class="card-difficulty diff-${escapeHtml(m.difficulty)}">${escapeHtml(m.difficulty)}</div>
           <div class="card-title">${escapeHtml(m.title)}</div>
           ${m.hindi_title ? `<div class="card-hindi-title">${escapeHtml(m.hindi_title)}</div>` : ''}
           <div class="card-year">(${m.year})</div>
-          ${extraTime ? `<div class="card-extra-time">⏱ Extra time granted — ${fmtTime(m.min_mime_seconds)} for this one</div>` : ''}
+          ${duration.longTitle ? `<div class="card-bonus-badge">⏱ Long title bonus</div>` : ''}
+          ${extraTime ? `<div class="card-extra-time">⏱ Extra time granted — ${fmtTime(duration.total)} for this one${extraTimeReasons.length ? ` (${escapeHtml(extraTimeReasons.join(', '))})` : ''}</div>` : ''}
           ${m.mime_hint ? `<div class="card-hint">💡 ${escapeHtml(m.mime_hint)}</div>` : ''}
         </div>`;
       if (state.mode === 'individual') {
@@ -1140,7 +1345,7 @@
       } else {
         actionsEl.innerHTML = `
           <button class="result-btn correct-btn" onclick="resolve('correct')">✅ Correct</button>
-          <button class="result-btn pass-btn" onclick="resolve('pass')">🙅 Pass</button>`;
+          <button class="result-btn pass-btn" onclick="resolve('pass')">🙅 ${state.allow_steal ? 'Pass' : 'Nobody Guessed'}</button>`;
       }
     } else {
       stageEl.innerHTML = `
@@ -1219,6 +1424,8 @@
   function showModal() {
     renderModeToggle();
     renderSourceToggle();
+    renderStartYearInput();
+    renderAllowStealToggle();
     const limits = MODE_LIMITS[currentMode];
     const namesForMode = (lastTeamNames.length >= limits.min && lastTeamNames.length <= limits.max)
       ? lastTeamNames
@@ -1238,6 +1445,8 @@
   async function startWithTeams() {
     const limits = MODE_LIMITS[currentMode];
     const names = readTeamRows().map((n, i) => n.trim() || `${limits.label} ${i + 1}`);
+    const startYear = readStartYear();
+    const stealAllowed = readAllowSteal();
     const btn = document.getElementById('modalStartBtn');
     btn.disabled = true;
     btn.textContent = 'Starting…';
@@ -1246,7 +1455,7 @@
       const state = await fetchJson('/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, teams: names, mode: currentMode, movie_source: currentSource })
+        body: JSON.stringify({ session_id: sessionId, teams: names, mode: currentMode, movie_source: currentSource, start_year: startYear, allow_steal: stealAllowed })
       });
       hideModal();
       renderState(state);
@@ -1283,6 +1492,14 @@
     try {
       const config = await fetchJson('/config');
       onlineModeAvailable = !!config.online_mode_available;
+      if (Number.isFinite(config.min_year)) minMovieYear = config.min_year;
+      if (Number.isFinite(config.max_year)) maxMovieYear = config.max_year;
+      const storedStartYear = Number(localStorage.getItem('dc_start_year'));
+      const fallbackStartYear = Number.isFinite(config.default_start_year)
+        ? config.default_start_year
+        : currentStartYear;
+      currentStartYear = clampStartYear(Number.isFinite(storedStartYear) ? storedStartYear : fallbackStartYear);
+      localStorage.setItem('dc_start_year', String(currentStartYear));
     } catch {
       onlineModeAvailable = false;
     }

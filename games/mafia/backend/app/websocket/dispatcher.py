@@ -103,6 +103,12 @@ async def dispatch_client_event(
         )
         return False
 
+    if event_type == "reset_game":
+        await _handle_reset_game(
+            room_code, player_id, room_manager, game_session_manager, connection_manager, night_timer_manager
+        )
+        return False
+
     if event_type == "advance_phase":
         await _handle_advance_phase(
             room_code, player_id, room_manager, game_session_manager, connection_manager, night_timer_manager
@@ -324,6 +330,30 @@ async def _handle_advance_phase(
     await _broadcast_advance_events(events, room_code, connection_manager)
     await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
     await _sync_night_timer(room_code, room_manager, connection_manager, game_session_manager, night_timer_manager)
+
+
+async def _handle_reset_game(
+    room_code: str,
+    player_id: str,
+    room_manager: RoomManager,
+    game_session_manager: GameSessionManager,
+    connection_manager: ConnectionManager,
+    night_timer_manager: NightTimerManager,
+) -> None:
+    try:
+        await game_session_manager.reset_game(room_code, player_id)
+    except PermissionDeniedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "permission_denied", str(exc))
+        return
+    except GameNotStartedError as exc:
+        await _send_error(connection_manager, room_code, player_id, "game_not_started", str(exc))
+        return
+    except InvalidGameStateError as exc:
+        await _send_error(connection_manager, room_code, player_id, "invalid_game_state", str(exc))
+        return
+
+    night_timer_manager.cancel(room_code)
+    await broadcast_room_state(room_code, room_manager, connection_manager, game_session_manager)
 
 
 async def _broadcast_advance_events(events: list, room_code: str, connection_manager: ConnectionManager) -> None:

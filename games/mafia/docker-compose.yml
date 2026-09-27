@@ -6,14 +6,15 @@ services:
     volumes:
       - backend_data:/app/data
     environment:
-      REVELRY_CORS_ORIGINS: '["http://localhost:3000"]'
+      REVELRY_CORS_ORIGINS: '["http://localhost:3000","http://192.168.1.108:3000"]'
+      REVELRY_FRONTEND_BASE_URL: http://192.168.1.108:3000
 
   frontend:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-        NEXT_PUBLIC_WS_BASE_URL: ws://localhost:8000
+        NEXT_PUBLIC_API_BASE_URL: http://192.168.1.108:8000
+        NEXT_PUBLIC_WS_BASE_URL: ws://192.168.1.108:8000
     ports:
       - "3000:3000"
     depends_on:

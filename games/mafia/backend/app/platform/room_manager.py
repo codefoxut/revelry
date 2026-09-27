@@ -147,6 +147,15 @@ class RoomManager:
         await self._room_store.save(room)
         return room
 
+    async def reset_for_replay(self, code: str) -> Room:
+        room = await self.require_room(code)
+        room.phase = RoomPhase.LOBBY
+        for player in room.players.values():
+            player.is_ready = False
+            player.is_spectator = False
+        await self._room_store.save(room)
+        return room
+
     def _require_player(self, room: Room, player_id: str) -> Player:
         player = room.players.get(player_id)
         if player is None:

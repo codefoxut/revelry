@@ -1,4 +1,4 @@
-import { WS_BASE_URL } from "@/lib/config";
+import { wsBaseUrl } from "@/lib/config";
 import type { ClientCommand, ServerEvent } from "@/types/ws-events";
 
 interface RoomSocketHandlers {
@@ -41,7 +41,7 @@ export class RoomSocket {
       this.retryTimer = null;
     }
 
-    const url = `${WS_BASE_URL}/ws/${this.roomCode}?player_id=${encodeURIComponent(this.playerId)}`;
+    const url = `${wsBaseUrl()}/ws/${this.roomCode}?player_id=${encodeURIComponent(this.playerId)}`;
     const ws = new WebSocket(url);
 
     ws.onopen = () => {

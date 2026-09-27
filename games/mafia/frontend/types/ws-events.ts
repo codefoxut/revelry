@@ -155,6 +155,10 @@ export interface StartGameCommand {
   enabled_role_keys?: string[] | null;
 }
 
+export interface ResetGameCommand {
+  type: "reset_game";
+}
+
 export interface AdvancePhaseCommand {
   type: "advance_phase";
 }
@@ -188,6 +192,7 @@ export type ClientCommand =
   | KickPlayerCommand
   | LeaveRoomCommand
   | StartGameCommand
+  | ResetGameCommand
   | AdvancePhaseCommand
   | NightActionCommand
   | CastVoteCommand

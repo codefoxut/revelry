@@ -154,6 +154,54 @@ describe("roomStore", () => {
     ]);
   });
 
+  it("clears gameOver and role state when the room returns to the lobby", () => {
+    captured!.onEvent({
+      type: "role_assigned",
+      role: {
+        key: "mafia",
+        display_name: "Mafia",
+        team: "mafia",
+        description: "Secretly eliminate town.",
+        acts_at_night: true,
+        allow_self_target: false,
+      },
+    });
+    captured!.onEvent({
+      type: "game_over",
+      winning_team: "town",
+      roles: [
+        { player_id: "p1", role_key: "mafia", role_display_name: "Mafia", team: "mafia" },
+      ],
+    });
+
+    captured!.onEvent({
+      type: "room_state",
+      room: baseRoom({ phase: "lobby", game_state: null }),
+    });
+
+    const state = useRoomStore.getState();
+    expect(state.myRole).toBeNull();
+    expect(state.gameOver).toBeNull();
+    expect(state.nightTimer).toBeNull();
+  });
+
+  it("clears a previous gameOver when a fresh round starts", () => {
+    captured!.onEvent({
+      type: "game_over",
+      winning_team: "town",
+      roles: [
+        { player_id: "p1", role_key: "mafia", role_display_name: "Mafia", team: "mafia" },
+      ],
+    });
+
+    captured!.onEvent({
+      type: "room_state",
+      room: baseRoom({ phase: "in_game", game_state: { phase: "night", round_number: 1, alive_player_ids: ["p1", "p2"] } }),
+    });
+
+    expect(useRoomStore.getState().gameOver).toBeNull();
+  });
+
   it("stores the list of eliminated player ids on night_result", () => {
     captured!.onEvent({ type: "night_result", eliminated_player_ids: ["p1", "p2"] });
 
