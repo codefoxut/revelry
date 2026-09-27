@@ -35,6 +35,7 @@ Game data (SQLite) persists across restarts in a named Docker volume.
 ```bash
 make install         # create backend .venv + pip install, npm install for frontend
 make dev             # run backend (uvicorn --reload) and frontend (next dev) together
+make dev-lan         # run both services for phones/laptops on your local network
 ```
 
 Or run each side on its own:
@@ -42,6 +43,7 @@ Or run each side on its own:
 ```bash
 make dev-backend     # http://localhost:8000
 make dev-frontend    # http://localhost:3000
+make dev-lan         # http://192.168.1.108:3000 (override with LAN_HOST=x.x.x.x)
 ```
 
 ## Running tests

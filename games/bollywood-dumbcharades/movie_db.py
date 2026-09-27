@@ -79,6 +79,25 @@ def all_movies() -> list[dict]:
     return [_row_to_dict(r) for r in rows]
 
 
+def movies_from_year(start_year: int) -> list[dict]:
+    conn = init_db()
+    rows = conn.execute(
+        "SELECT * FROM movies WHERE year >= ? ORDER BY year",
+        (start_year,),
+    ).fetchall()
+    conn.close()
+    return [_row_to_dict(r) for r in rows]
+
+
+def movie_year_bounds() -> tuple[int | None, int | None]:
+    conn = init_db()
+    row = conn.execute("SELECT MIN(year) AS min_year, MAX(year) AS max_year FROM movies").fetchone()
+    conn.close()
+    if row is None or row["min_year"] is None or row["max_year"] is None:
+        return None, None
+    return row["min_year"], row["max_year"]
+
+
 def ready_movies() -> list[dict]:
     conn = init_db()
     rows = conn.execute(

@@ -93,10 +93,26 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
         switch (event.type) {
           case "room_state": {
             const startingNewRound = event.room.game_state?.phase === "night";
+            const returningToLobby = event.room.phase === "lobby";
             set({
               room: event.room,
+              ...(returningToLobby
+                ? {
+                    myRole: null,
+                    nightResult: null,
+                    eliminationResult: null,
+                    gameOver: null,
+                    investigationResult: null,
+                    votes: {},
+                    mafiaPicks: [],
+                    nightTimer: null,
+                    revealedMayorIds: [],
+                    terroristBomb: null,
+                  }
+                : {}),
               ...(startingNewRound
                 ? {
+                    gameOver: null,
                     nightResult: null,
                     eliminationResult: null,
                     investigationResult: null,

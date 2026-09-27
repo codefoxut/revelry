@@ -51,6 +51,7 @@ class MafiaGameEngine(GameEngine):
         # all share this one dict; detective resolves immediately and never
         # occupies a slot in it).
         self._night_actions: dict[str, str] = {}
+        self._resolved_investigations: set[str] = set()
         self._mafia_locked: set[str] = set()
         # Terrorist's bomb spans a round boundary, so it lives here instead
         # of `_night_actions` — that dict is cleared every night, but a
@@ -119,6 +120,7 @@ class MafiaGameEngine(GameEngine):
         self._machine.transition_to(MafiaPhase.NIGHT)
         self._round_number = 1
         self._alive = {player_id: True for player_id in active_player_ids}
+        self._resolved_investigations.clear()
         self._conflict_resolution = conflict_resolution
         self._day_tie_resolution = day_tie_resolution
         self._vigilante_uses_remaining = {
@@ -166,17 +168,25 @@ class MafiaGameEngine(GameEngine):
             self._mafia_locked.clear()
             return [MafiaTargetsUpdatedEvent(picks=self._mafia_picks_snapshot())]
         if kind is NightActionKind.DETECTIVE_INVESTIGATE:
+            if player_id in self._resolved_investigations:
+                raise InvalidGameStateError("Detective has already investigated this night")
+
             target_role = self._roles[target_player_id]
             reported_team = target_role.investigate_as or target_role.team
+            self._resolved_investigations.add(player_id)
             return [
                 InvestigationResultEvent(
                     player_id=player_id, target_player_id=target_player_id, team=reported_team.value
                 )
             ]
         if kind is NightActionKind.ORACLE_INVESTIGATE:
+            if player_id in self._resolved_investigations:
+                raise InvalidGameStateError("Oracle has already investigated this night")
+
             target_role = self._roles[target_player_id]
             effective_team = target_role.investigate_as or target_role.team
             reported_team = Team.MAFIA if effective_team is Team.MAFIA else Team.TOWN
+            self._resolved_investigations.add(player_id)
             return [
                 InvestigationResultEvent(
                     player_id=player_id, target_player_id=target_player_id, team=reported_team.value
@@ -383,6 +393,7 @@ class MafiaGameEngine(GameEngine):
 
         # 10. Clear all per-night deferred state.
         self._night_actions.clear()
+        self._resolved_investigations.clear()
         self._mafia_locked.clear()
         self._bomb_withdraw_requested = False
 

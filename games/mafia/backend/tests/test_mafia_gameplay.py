@@ -348,6 +348,37 @@ def test_detective_investigation_resolves_immediately():
     assert events == [InvestigationResultEvent(player_id="p3", target_player_id="p1", team="mafia")]
 
 
+def test_detective_can_only_investigate_once_per_night():
+    engine = _standard_engine()
+
+    _night_action(engine, "p3", "p1")
+
+    with pytest.raises(InvalidGameStateError, match="already investigated this night"):
+        _night_action(engine, "p3", "p2")
+
+
+def test_detective_can_investigate_again_on_a_later_night():
+    engine = MafiaGameEngine("DET03")
+    players = ["p1", "p2", "p3", "p4", "p5"]
+    _start(engine, players)
+    _force_roles(engine, {"p1": "mafia", "p2": "detective", "p3": "doctor", "p4": "villager", "p5": "villager"})
+
+    _night_action(engine, "p2", "p1")
+    _night_action(engine, "p1", "p4")
+    _lock(engine, "p1")
+    _advance(engine)  # night -> day
+    _advance(engine)  # day -> voting
+    _vote(engine, "p1", "p5")
+    _vote(engine, "p2", "p5")
+    _vote(engine, "p3", "p5")
+    _advance(engine)  # voting -> elimination
+    _advance(engine)  # elimination -> next night
+
+    events = _night_action(engine, "p2", "p1")
+
+    assert events == [InvestigationResultEvent(player_id="p2", target_player_id="p1", team="mafia")]
+
+
 def test_detective_investigates_serial_killer_as_neutral():
     engine = MafiaGameEngine("DET02")
     players = ["p1", "p2", "p3", "p4"]

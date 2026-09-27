@@ -190,6 +190,14 @@ class StartGameCommand(BaseModel):
     enabled_role_keys: list[str] | None = None
 
 
+class ResetGameCommand(BaseModel):
+    """Host-only: return a finished game to the lobby without changing the
+    room code or kicking players.
+    """
+
+    type: Literal["reset_game"] = "reset_game"
+
+
 class AdvancePhaseCommand(BaseModel):
     """Host-only: manually advances to the next phase in the game's cycle.
     Stands in for automatic timer/vote-driven advancement (later steps).

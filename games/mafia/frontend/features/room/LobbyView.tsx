@@ -21,6 +21,33 @@ import {
 // Mirrors MAFIA_MODULE.min_players in app/games/mafia/__init__.py.
 const MIN_PLAYERS_TO_START = 4;
 
+function copyText(text: string): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+
+  if (typeof document === "undefined") {
+    return Promise.reject(new Error("Clipboard is unavailable"));
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {
+    document.execCommand("copy");
+    return Promise.resolve();
+  } catch {
+    return Promise.reject(new Error("Copy failed"));
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
 type ConflictResolution = StartGameCommand["conflict_resolution"];
 type DayTieResolution = StartGameCommand["day_tie_resolution"];
 
@@ -119,9 +146,13 @@ export function LobbyView() {
   }
 
   async function copyInvite() {
-    await navigator.clipboard.writeText(room!.invite_url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await copyText(room!.invite_url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
   }
 
   return (

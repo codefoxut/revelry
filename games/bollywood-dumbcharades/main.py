@@ -24,6 +24,7 @@ MIN_TEAMS = 2
 MAX_TEAMS = 8
 MIN_PLAYERS = 3
 MAX_PLAYERS = 5
+DEFAULT_START_YEAR = 2000
 
 MOVIE_JSON_SCHEMA = {
     "type": "object",
@@ -43,52 +44,60 @@ def online_mode_available() -> bool:
     return bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
 
 
-def generate_online_movie(used_titles: List[str]) -> dict:
+def generate_online_movie(used_titles: List[str], start_year: int) -> dict:
     """Ask Claude for one Bollywood movie to mime, live.
 
     Used only in online mode, as an alternative to sampling data/movies.db.
     """
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     avoid = ", ".join(used_titles) if used_titles else "none yet"
-    response = client.messages.create(
-        model="claude-opus-4-8",
-        max_tokens=300,
-        output_config={
-            "effort": "low",
-            "format": {"type": "json_schema", "schema": MOVIE_JSON_SCHEMA},
-        },
-        messages=[{
-            "role": "user",
-            "content": (
-                "Suggest one real, well-known Bollywood movie for a game of dumb "
-                "charades. Title length doesn't matter. Rate difficulty as "
-                "easy/medium/hard/ultra_hard based on how concrete and "
-                "recognizable it is once mimed. For hard or ultra_hard, also give "
-                "min_mime_seconds (minimum seconds realistically needed to mime "
-                "it out); otherwise min_mime_seconds must be null. "
-                f"Do not suggest any of these already-used titles: {avoid}."
-            ),
-        }],
-    )
-    text = next(b.text for b in response.content if b.type == "text")
-    data = json.loads(text)
-    return {
-        "id": movie_db.slugify(data["title"]),
-        "title": data["title"],
-        "year": data["year"],
-        "difficulty": data["difficulty"],
-        "mime_hint": data["mime_hint"],
-        "min_mime_seconds": data["min_mime_seconds"],
-    }
+
+    for _ in range(3):
+        response = client.messages.create(
+            model="claude-opus-4-8",
+            max_tokens=300,
+            output_config={
+                "effort": "low",
+                "format": {"type": "json_schema", "schema": MOVIE_JSON_SCHEMA},
+            },
+            messages=[{
+                "role": "user",
+                "content": (
+                    "Suggest one real, well-known Bollywood movie for a game of dumb "
+                    "charades. Title length doesn't matter. Rate difficulty as "
+                    "easy/medium/hard/ultra_hard based on how concrete and "
+                    "recognizable it is once mimed. For hard or ultra_hard, also give "
+                    "min_mime_seconds (minimum seconds realistically needed to mime "
+                    "it out); otherwise min_mime_seconds must be null. "
+                    f"Only suggest movies released in or after {start_year}. "
+                    f"Do not suggest any of these already-used titles: {avoid}."
+                ),
+            }],
+        )
+        text = next(b.text for b in response.content if b.type == "text")
+        data = json.loads(text)
+        if data["year"] >= start_year and data["title"] not in used_titles:
+            return {
+                "id": movie_db.slugify(data["title"]),
+                "title": data["title"],
+                "year": data["year"],
+                "difficulty": data["difficulty"],
+                "mime_hint": data["mime_hint"],
+                "min_mime_seconds": data["min_mime_seconds"],
+            }
+
+    raise ValueError("Could not generate a movie matching the selected year")
 
 
-def pick_offline_movie(used_titles: List[str]) -> Optional[dict]:
+def pick_offline_movie(used_titles: List[str], start_year: int) -> Optional[dict]:
     """Draw one random not-yet-used movie from data/movies.db.
 
     Called fresh on every /reveal (not pre-sampled at session start) so a
     session can run indefinitely without running out of a fixed-size pool.
     """
-    available = [m for m in movie_db.all_movies() if m["title"] not in used_titles]
+    available = [
+        m for m in movie_db.movies_from_year(start_year) if m["title"] not in used_titles
+    ]
     if not available:
         return None
     m = random.choice(available)
@@ -126,11 +135,19 @@ def delete_session(session_id: str) -> None:
         path.unlink()
 
 
-def new_state(participant_names: List[str], mode: str, movie_source: str) -> dict:
+def new_state(
+    participant_names: List[str],
+    mode: str,
+    movie_source: str,
+    start_year: int,
+    allow_steal: bool,
+) -> dict:
     teams = [{"id": f"t{i}", "name": name} for i, name in enumerate(participant_names)]
     return {
         "mode": mode,
         "movie_source": movie_source,
+        "start_year": start_year,
+        "allow_steal": allow_steal,
         "teams": teams,
         "scores": {t["id"]: 0 for t in teams},
         "turn_index": 0,
@@ -151,6 +168,8 @@ class StartRequest(BaseModel):
     teams: List[str]
     mode: str = "teams"  # "teams" | "individual"
     movie_source: str = "offline"  # "offline" | "online"
+    start_year: Optional[int] = None
+    allow_steal: bool = False
 
 
 class ResolveRequest(BaseModel):
@@ -176,16 +195,35 @@ async def start_game(req: StartRequest):
             status_code=400,
             detail="Online mode requires ANTHROPIC_API_KEY to be configured",
         )
+    db_min_year, db_max_year = movie_db.movie_year_bounds()
+    start_year = req.start_year if req.start_year is not None else DEFAULT_START_YEAR
+    if db_min_year is not None and start_year < db_min_year:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Start year must be at least {db_min_year}",
+        )
+    if movie_source == "offline" and db_max_year is not None and start_year > db_max_year:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No offline movies available from {start_year} onwards",
+        )
+    allow_steal = bool(req.allow_steal) and mode == "teams"
     label = "Team" if mode == "teams" else "Player"
     participant_names = [name.strip() or f"{label} {i + 1}" for i, name in enumerate(req.teams)]
-    state = new_state(participant_names, mode, movie_source)
+    state = new_state(participant_names, mode, movie_source, start_year, allow_steal)
     save_session(req.session_id, state)
     return state
 
 
 @app.get("/config")
 async def get_config():
-    return {"online_mode_available": online_mode_available()}
+    min_year, max_year = movie_db.movie_year_bounds()
+    return {
+        "online_mode_available": online_mode_available(),
+        "default_start_year": DEFAULT_START_YEAR,
+        "min_year": min_year,
+        "max_year": max_year,
+    }
 
 
 @app.get("/state/{session_id}")
@@ -205,18 +243,22 @@ async def reveal_movie(session_id: str):
         raise HTTPException(status_code=400, detail="A movie is already revealed")
 
     used_titles = state.setdefault("used_titles", [])
+    start_year = state.get("start_year", DEFAULT_START_YEAR)
     if state.get("movie_source", "offline") == "online":
         try:
-            movie = generate_online_movie(used_titles)
+            movie = generate_online_movie(used_titles, start_year)
         except Exception:
             raise HTTPException(
                 status_code=502,
                 detail="Could not reach Claude to pick a movie. Try again.",
             )
     else:
-        movie = pick_offline_movie(used_titles)
+        movie = pick_offline_movie(used_titles, start_year)
         if movie is None:
-            raise HTTPException(status_code=400, detail="No movies left to pick from")
+            raise HTTPException(
+                status_code=400,
+                detail=f"No movies left to pick from {start_year} onwards",
+            )
 
     state["current"] = movie
     used_titles.append(movie["title"])
@@ -236,6 +278,7 @@ async def resolve_round(session_id: str, req: ResolveRequest):
     result = req.result
     turn = state["turn_index"]
     next_index = next_turn_index(state)
+    allow_steal = bool(state.get("allow_steal", False))
 
     if state.get("mode") == "individual":
         mimer_id = state["teams"][turn]["id"]
@@ -265,7 +308,12 @@ async def resolve_round(session_id: str, req: ResolveRequest):
     elif result == "pass":
         if state["pending_steal"]:
             raise HTTPException(status_code=400, detail="Already offered as a steal")
-        state["pending_steal"] = True
+        if allow_steal:
+            state["pending_steal"] = True
+        else:
+            state["current"] = None
+            state["turn_index"] = next_index
+            state["pending_steal"] = False
     elif result == "steal_correct":
         if not state["pending_steal"]:
             raise HTTPException(status_code=400, detail="No steal is pending")

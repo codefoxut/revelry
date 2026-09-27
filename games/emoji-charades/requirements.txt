@@ -1,7 +1,5 @@
-fastapi[all]
+-r ../configs/pip/fastapi_reqs.txt
+-r ../configs/pip/pytest_reqs.txt
+-r ../configs/pip/httpx2_reqs.txt
 anthropic
-uvicorn[standard]
 python-dotenv
-pytest>=8.3
-pytest-asyncio>=1.4.0
-httpx2>=2.12.0

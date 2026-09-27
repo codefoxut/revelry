@@ -1,4 +1,5 @@
+-r ../configs/pip/httpx2_reqs.txt
+
 tornado>=6.5.8,<7.0
 anthropic>=1.4.0
-httpx2>=2.12.0
-nltk>=3.9.0
+nltk>=3.10.3

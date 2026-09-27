@@ -13,9 +13,11 @@ from app.games.mafia.commands import (
 )
 from app.games.mafia.conflict_resolution import ConflictResolution
 from app.games.mafia.day_tie_resolution import DayTieResolution
+from app.games.mafia.phases import MafiaPhase
 from app.platform.exceptions import (
     GameAlreadyStartedError,
     GameNotStartedError,
+    InvalidGameStateError,
     NotEnoughPlayersError,
     PermissionDeniedError,
 )
@@ -90,6 +92,21 @@ class GameSessionManager:
             raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
 
         return await engine.handle_command(AdvancePhaseCommand(player_id=requester_id))
+
+    async def reset_game(self, room_code: str, requester_id: str) -> Room:
+        room = await self._room_manager.require_room(room_code)
+        if room.host_player_id != requester_id:
+            raise PermissionDeniedError("Only the host can reset the game")
+
+        engine = await self._engine_store.get(room_code)
+        if engine is None:
+            raise GameNotStartedError(f"Room {room_code!r} hasn't started a game")
+
+        if engine.phase_snapshot().get("phase") != MafiaPhase.GAME_OVER.value:
+            raise InvalidGameStateError("Game can only be reset after it ends")
+
+        await self._engine_store.delete(room_code)
+        return await self._room_manager.reset_for_replay(room_code)
 
     async def submit_night_action(self, room_code: str, player_id: str, target_player_id: str) -> list[Event]:
         engine = await self._engine_store.get(room_code)

@@ -40,6 +40,7 @@ export function GameView() {
   const mayorAlreadyRevealed = selfPlayerId ? revealedMayorIds.includes(selfPlayerId) : false;
   const isTerrorist = myRole?.key === "terrorist";
   const bombPending = isTerrorist && (terroristBomb?.pending ?? false);
+  const isInvestigator = myRole?.key === "detective" || myRole?.key === "oracle";
 
   function submitNightAction(targetId: string) {
     sendCommand({ type: "night_action", target_player_id: targetId });
@@ -63,6 +64,10 @@ export function GameView() {
 
   function advancePhase() {
     sendCommand({ type: "advance_phase" });
+  }
+
+  function resetGame() {
+    sendCommand({ type: "reset_game" });
   }
 
   if (gameOver) {
@@ -102,6 +107,17 @@ export function GameView() {
         >
           Back home
         </button>
+        {isHost ? (
+          <button
+            type="button"
+            onClick={resetGame}
+            className="h-12 rounded-full border border-zinc-700 px-8 font-medium text-zinc-200 transition-colors hover:border-zinc-500 hover:text-white"
+          >
+            Back to lobby
+          </button>
+        ) : (
+          <p className="text-sm text-zinc-500">Waiting for the host to send everyone back to the lobby.</p>
+        )}
       </div>
     );
   }
@@ -174,12 +190,23 @@ export function GameView() {
           </div>
         )}
         {phase === "night" && selfAlive && myRole?.acts_at_night && !bombPending && (
-          <TargetPicker
-            key={`night-${roundNumber}`}
-            label="Choose your target"
-            players={nightActionTargets}
-            onSelect={submitNightAction}
-          />
+          isInvestigator ? (
+            <TargetPicker
+              key={`night-${roundNumber}`}
+              label="Choose your target"
+              players={nightActionTargets}
+              onSelect={submitNightAction}
+              submitLabel="Submit investigation"
+              locked={Boolean(investigationResult)}
+            />
+          ) : (
+            <TargetPicker
+              key={`night-${roundNumber}`}
+              label="Choose your target"
+              players={nightActionTargets}
+              onSelect={submitNightAction}
+            />
+          )
         )}
         {phase === "night" && selfAlive && myRole?.team === "mafia" && !isTerrorist && (
           <MafiaTeamPanel
@@ -249,17 +276,30 @@ function TargetPicker({
   players,
   onSelect,
   voteCounts,
+  submitLabel,
+  locked = false,
 }: {
   label: string;
   players: Player[];
   onSelect: (targetId: string) => void;
   voteCounts?: Record<string, number>;
+  submitLabel?: string;
+  locked?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   function handleSelect(targetId: string) {
+    if (locked) return;
+
     setSelectedId(targetId);
-    onSelect(targetId);
+    if (!submitLabel) {
+      onSelect(targetId);
+    }
+  }
+
+  function handleSubmit() {
+    if (!selectedId || locked) return;
+    onSelect(selectedId);
   }
 
   return (
@@ -271,11 +311,12 @@ function TargetPicker({
             <button
               type="button"
               onClick={() => handleSelect(player.id)}
+              disabled={locked}
               className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
                 selectedId === player.id
                   ? "border-rose-500 bg-rose-950/50 text-rose-200"
                   : "border-zinc-800 text-zinc-300 hover:border-zinc-600"
-              }`}
+              } disabled:cursor-not-allowed disabled:border-zinc-800 disabled:bg-zinc-900 disabled:text-zinc-500`}
             >
               <span>{player.display_name}</span>
               {voteCounts && voteCounts[player.id] ? (
@@ -285,6 +326,16 @@ function TargetPicker({
           </li>
         ))}
       </ul>
+      {submitLabel ? (
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!selectedId || locked}
+          className="h-10 rounded-full bg-rose-500 px-6 font-medium text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+        >
+          {locked ? "Investigation submitted ✓" : submitLabel}
+        </button>
+      ) : null}
     </div>
   );
 }
