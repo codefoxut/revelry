@@ -1,5 +1,5 @@
 -r ../../configs/pip/fastapi_reqs.txt
 -r ../../configs/pip/pytest_reqs.txt
-websockets>=13.0
+websockets>=17.2
 
 httpx>=0.28.1
