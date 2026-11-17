@@ -10,23 +10,25 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "next": ">=16.4.5",
-    "react": "19.3.0",
+    "react": "19.3.1",
     "react-dom": "19.3.1",
     "sharp": ">=0.35.5",
     "zustand": "^5.1.0"
   },
   "devDependencies": {
-    "next": ">=16.4.5",
-    "sharp": ">=0.35.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^10",
     "eslint-config-next": "16.4.6",
+    "next": "^16.4.6",
+    "sharp": ">=0.35.5",
     "tailwindcss": "^4",
     "typescript": "^7",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "minimatch": ">=11.0.1"
   }
 }
