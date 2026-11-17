@@ -1,10 +1,7 @@
 -r ../../configs/pip/fastapi_reqs.txt
 -r ../../configs/pip/pytest_reqs.txt
+-r ../../configs/pip/httpx2_reqs.txt
 
-sqlalchemy>=2.0
-aiosqlite>=0.20
+sqlalchemy>=2.1.1
+aiosqlite>=0.22.1
 greenlet>=3.5.6
-
-pytest>=8.3
-pytest-asyncio>=1.4.0
-httpx2>=2.0
