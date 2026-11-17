@@ -1,6 +1,6 @@
 -r ../configs/pip/fastapi_reqs.txt
 
-anthropic
+anthropic==2.9.0
 python-dotenv
-httpx2
+httpx2==2.16.2
 beautifulsoup4
