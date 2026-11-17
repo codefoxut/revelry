@@ -2,6 +2,6 @@
 -r ../../configs/pip/pytest_reqs.txt
 -r ../../configs/pip/httpx2_reqs.txt
 
-sqlalchemy>=2.1.1
+sqlalchemy>=2.1.8
 aiosqlite>=0.22.1
 greenlet>=3.5.6
