@@ -1,4 +1,4 @@
-fastapi[all]==0.163.1
+fastapi[all]==0.165.0
 anthropic==2.9.0
 uvicorn[standard]==0.54.0
 python-dotenv
